@@ -279,11 +279,8 @@ Contributions welcome. If you're adding support for a new AI platform:
 
 ## Credits
 
-Built by [Aasif Iqbal J.](https://aasifj.com) with Claude.
+Built by/with Claude by [Aasif Iqbal J.](https://aasifj.com) 
 
-Aasif is a full-time author based in Coimbatore, India. He built this after analysing 849 days of his own Claude conversations and realising he had no visibility into how his AI usage had evolved — or what it revealed about how he thinks and works.
-
-claude-mirror is the tool he wished existed.
 
 ---
 
