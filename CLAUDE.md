@@ -23,10 +23,8 @@ Full context in README.md.
 ---
 
 ## Architecture
-
 ```
 onboarding.py   → config.json
-analyse.py      → reads config + data/, prints stats
 classify.py     → reads config + data/, writes classified.csv
 report.py       → reads config + classified.csv, writes output/report.html + output/report.md
 ```
@@ -49,15 +47,15 @@ Always normalise to user-messages-only before analysis.
 
 ## Styling
 
-Gen Z aesthetic, light mode:
-- Background: `#FFFFFF`
-- Text: `#0D0D0D`
-- Primary accent: `#7C3AED` (violet)
-- Secondary accents: `#FF4D6D`, `#00C896`, `#FFD600`, `#0EA5E9`
-- Font: Inter (data/body), Space Grotesk (headings/numbers)
-- Charts: white background, saturated palette, clean gridlines
+Professional serif aesthetic, light mode:
+- Background: `#F5F0E8` (warm off-white)
+- Text: `#1B2A3B` (dark navy)
+- Primary accent: `#003153` (Prussian Blue)
+- Chart palette: Prussian Blue gradient, muted and desaturated
+- Font: Cormorant Garamond (headings), serif body
+- Charts: warm off-white background, clean gridlines, no saturated colours
 
-Do NOT change the aesthetic to corporate/muted/conservative.
+Do NOT change the aesthetic to Gen Z, high-contrast neon, or corporate flat design.
 
 ---
 
@@ -66,7 +64,7 @@ Do NOT change the aesthetic to corporate/muted/conservative.
 - Do not add external API calls without explicit user consent
 - Do not store API keys
 - Do not split the report into multiple HTML files
-- Do not add V2 features (browser UI, GapFinder integration) without a separate branch
+- Do not add V2 features (browser UI) without a separate branch
 - Do not change the single-file report structure
 
 ---
@@ -74,7 +72,7 @@ Do NOT change the aesthetic to corporate/muted/conservative.
 ## Adding Platform Support
 
 1. Add detection in `detect_platform()` in `classify.py`
-2. Add extraction in `get_messages()` and `get_text()` 
+2. Add extraction in `get_messages()` and `get_text()`
 3. Add metadata extraction in `get_conv_meta()`
 4. Test with a sample anonymised export
 5. Update README supported platforms table
