@@ -1,0 +1,11 @@
+config.json
+*.pyc
+__pycache__/
+.DS_Store
+conversations.json
+report.html
+report.md
+*.zip
+venv/
+.env
+classified.csv
