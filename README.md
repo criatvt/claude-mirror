@@ -271,9 +271,7 @@ Contributions welcome. If you're adding support for a new AI platform:
 
 **V2 (planned)**
 - Browser-based UI — no terminal needed
-- GapFinder integration — personal learning curriculum from your usage patterns
 - Quarter-on-quarter comparison
-- Optional cloud API for faster analysis
 
 ---
 
