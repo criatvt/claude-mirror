@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
@@ -46,7 +46,7 @@ def run():
         ]
     )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if period == "Last 3 months":
         cutoff = now - relativedelta(months=3)
     elif period == "Last 6 months":
