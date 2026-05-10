@@ -1,9 +1,10 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+
 
 def ask(prompt, max_chars=None, options=None):
     while True:
@@ -25,17 +26,19 @@ def ask(prompt, max_chars=None, options=None):
                 continue
             return value
 
+
 def run():
-    print("\n" + "="*55)
+    print("\n" + "=" * 55)
     print("  claude-mirror — Personal AI Usage Analyser")
     print("  One-time setup. Takes under 2 minutes.")
-    print("="*55)
+    print("=" * 55)
     print("\nLet's personalise your report.\n")
 
     name = ask("Your name")
     mother_tongue = ask("Your mother tongue (e.g. Tamil, Hindi, Bengali)")
     profession = ask("Your profession in one line (max 60 characters)", max_chars=60)
     goal = ask("Your current top goal in one line (max 100 characters)", max_chars=100)
+
     period = ask(
         "Time period to analyse",
         options=[
@@ -46,7 +49,8 @@ def run():
         ]
     )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
+
     if period == "Last 3 months":
         cutoff = now - relativedelta(months=3)
     elif period == "Last 6 months":
@@ -69,11 +73,12 @@ def run():
     with open(CONFIG_PATH, 'w') as f:
         json.dump(config, f, indent=2)
 
-    print("\n" + "="*55)
+    print("\n" + "=" * 55)
     print(f"  Got it, {name}. Config saved.")
-    print("="*55)
+    print("=" * 55)
     print("\nNext step:")
     print("  python3 classify.py\n")
+
 
 if __name__ == "__main__":
     run()
