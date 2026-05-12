@@ -128,7 +128,7 @@ Takes under 2 minutes. Saves to `config.json` locally.
 
 ### Step 3 — Inspect your data
 ```bash
-python3 analyse.py
+python3 classify.py
 ```
 
 Shows you total conversations, date range, monthly breakdown, and platform detected. No AI used here — just fast data inspection.
@@ -196,7 +196,7 @@ claude-mirror/
 │   └── report.md              ← Your report (Markdown, reusable)
 ├── venv/                      ← Python virtual environment
 ├── onboarding.py              ← Step 1: setup
-├── analyse.py                 ← Step 2: inspect data
+├── classify.py                 ← Step 2: inspect data
 ├── classify.py                ← Step 3: classify conversations
 ├── report.py                  ← Step 4: generate report
 ├── config.json                ← Your saved onboarding answers
