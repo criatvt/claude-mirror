@@ -9,6 +9,11 @@ CONFIG_PATH = os.path.join(BASE, 'config.json')
 DATA_PATH = os.path.join(BASE, 'data', 'conversations.json')
 SAVE_PATH = os.path.join(BASE, 'classified.csv')
 
+CSV_COLUMNS = [
+    'uuid', 'name', 'created_at', 'updated_at', 'message_count',
+    'layer1', 'layer2', 'confidence', 'summary', 'key_themes',
+]
+
 CONTEXT_BUDGET = 10000
 SAMPLE_N = 10
 
@@ -29,10 +34,14 @@ cutoff = config.get('cutoff_date')
 # ── Resume support ────────────────────────────────────────────────────────────
 if os.path.exists(SAVE_PATH):
     existing = pd.read_csv(SAVE_PATH)
+    # Backward compat: ensure new columns exist on older CSVs
+    for col in ('summary', 'key_themes'):
+        if col not in existing.columns:
+            existing[col] = ''
     done_uuids = set(existing['uuid'].tolist())
     print(f"Resuming — {len(done_uuids)} done, {len(conversations) - len(done_uuids)} remaining.")
 else:
-    existing = pd.DataFrame()
+    existing = pd.DataFrame(columns=CSV_COLUMNS)
     done_uuids = set()
     print(f"Starting fresh — {len(conversations)} conversations to classify.")
 
@@ -101,7 +110,10 @@ def build_context(conv, platform):
     ctx = f"Title: {name}\nTotal user messages: {n} (coverage: {coverage})\n\nMessages:\n{body}"
     return uuid, name, created, updated, total, ctx
 
-PROMPT = """Classify this AI conversation into exactly one Layer 1 and one Layer 2 category.
+PROMPT = """Classify this AI conversation into EXACTLY ONE Layer 1 category and
+EXACTLY ONE Layer 2 category, then summarise what it was actually about.
+Consider the whole arc — opening, middle, and closing — not just the first message.
+If the conversation spans multiple themes, pick the dominant one.
 
 LAYER 1:
 - Writing (drafting, editing, feedback, grammar, rewriting)
@@ -123,11 +135,20 @@ Creative → [Fiction, Ideation, Worldbuilding, Scriptwriting]
 Personal → [Reflection, Health, Life decisions, Relationships]
 Admin → [Email, Formatting, Templates, Quick lookup]
 
+SUMMARY: one or two short sentences describing what the conversation was
+actually about. Be concrete (e.g., "Debugging React useEffect dependency loop"
+rather than "Coding question"). Reflect topic drift if the conversation moved.
+
+KEY_THEMES: 2-4 short lowercase noun phrases or entities (e.g., "react",
+"redux migration", "pricing", "hiring"). No sentences.
+
 CONVERSATION:
 {context}
 
-Respond ONLY with valid JSON, no explanation:
-{{"layer1": "...", "layer2": "...", "confidence": "high|medium|low"}}"""
+Respond ONLY with valid JSON, no explanation, no markdown fences. `layer1` and
+`layer2` MUST be single strings (one category each), not lists or comma-joined.
+`key_themes` MUST be a JSON array of 2-4 short strings.
+{{"layer1": "Strategy", "layer2": "Planning", "confidence": "high|medium|low", "summary": "...", "key_themes": ["theme1", "theme2"]}}"""
 
 # ── Classify ──────────────────────────────────────────────────────────────────
 results = []
@@ -158,13 +179,33 @@ for conv in tqdm(conversations, desc="Classifying"):
             if raw.startswith('json'):
                 raw = raw[4:]
         parsed = json.loads(raw)
-        layer1 = parsed.get('layer1', 'Unknown')
-        layer2 = parsed.get('layer2', 'Unknown')
+
+        def _first_label(v, default='Unknown'):
+            if isinstance(v, list):
+                v = v[0] if v else default
+            v = str(v).strip()
+            # If model returned "Strategy, Admin" or "Strategy/Admin", keep the first
+            for sep in (',', '/', ';', '|'):
+                if sep in v:
+                    v = v.split(sep)[0].strip()
+                    break
+            return v or default
+
+        layer1 = _first_label(parsed.get('layer1'))
+        layer2 = _first_label(parsed.get('layer2'))
         confidence = parsed.get('confidence', 'medium')
-    except:
+        summary = str(parsed.get('summary', '') or '').strip().replace('\n', ' ')
+        raw_themes = parsed.get('key_themes', []) or []
+        if isinstance(raw_themes, str):
+            raw_themes = [t for t in raw_themes.replace(',', ';').split(';')]
+        themes = [str(t).strip().lower() for t in raw_themes if str(t).strip()]
+        key_themes = ';'.join(themes[:5])
+    except Exception:
         layer1 = 'Unknown'
         layer2 = 'Unknown'
         confidence = 'low'
+        summary = ''
+        key_themes = ''
 
     results.append({
         'uuid': uuid,
@@ -175,16 +216,20 @@ for conv in tqdm(conversations, desc="Classifying"):
         'layer1': layer1,
         'layer2': layer2,
         'confidence': confidence,
+        'summary': summary,
+        'key_themes': key_themes,
     })
 
     if len(results) % 10 == 0:
         batch = pd.DataFrame(results)
         combined = pd.concat([existing, batch], ignore_index=True)
+        combined = combined.reindex(columns=CSV_COLUMNS)
         combined.to_csv(SAVE_PATH, index=False)
 
 if results:
     batch = pd.DataFrame(results)
     combined = pd.concat([existing, batch], ignore_index=True)
+    combined = combined.reindex(columns=CSV_COLUMNS)
     combined.to_csv(SAVE_PATH, index=False)
     print(f"\nDone. {len(combined)} conversations classified.")
     print(f"\nLayer 1 distribution:")
