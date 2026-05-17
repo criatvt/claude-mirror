@@ -308,6 +308,10 @@ else:
 BRIEF_PROMPT = f"""You are a personal intelligence coach analysing how someone uses AI.
 Write a deeply insightful personal intelligence brief in Markdown.
 
+Be tight. Total brief ≤ 600 words. Every section has a hard cap below — respect
+it. If a section can be said in fewer words, use fewer. Cut filler, hedging, and
+restatement. Prefer one sharp sentence over three soft ones.
+
 ABOUT THIS PERSON:
 - Name: {name}
 - Mother tongue: {config['mother_tongue']}
@@ -347,30 +351,42 @@ examples from the data above. Do not rely only on category counts — name the
 real topics (e.g., "react performance", "pricing models") and reference what
 the conversations were about.
 
-Write these exact sections in Markdown:
+Write these exact sections in Markdown, in this order, each within its cap:
 
 ## The Story Your Data Tells
 Narrative of their usage arc. Specific numbers. Connect to their goal.
+**Cap: ≤ 90 words.**
 
 ## Who You Are Through This Lens
 What this pattern reveals about how they think and work.
+**Cap: ≤ 70 words.**
 
 ## Surprises
 What is unexpected or counterintuitive in this data.
+**Cap: ≤ 3 bullets, ≤ 25 words each.**
 
 ## Blind Spots
 What they are NOT using AI for that someone with their goal should be.
+**Cap: ≤ 3 bullets, ≤ 25 words each.**
 
 ## Coaching Suggestions
-3-5 specific, actionable recommendations tied to their profession and goal.
+Specific, actionable recommendations tied to their profession and goal.
+**Cap: ≤ 3 numbered items, ≤ 30 words each.**
 
 ## What Changes Next
 Where their usage is heading if they continue on this path.
+**Cap: ≤ 50 words.**
 
 ## One Honest Observation
 One uncomfortable but important thing the data reveals.
+**Cap: ≤ 40 words.**
 
-Be direct, specific, intelligent. No generic advice. British English."""
+Be direct, specific, intelligent. No generic advice. British English.
+
+Before finishing, reread your draft. If any section exceeds its cap or the
+total exceeds 600 words, trim it. Do NOT drop a section to stay under the cap —
+every section above must appear. Do NOT include the "Cap:" lines in your
+output; they are instructions to you, not part of the brief."""
 
 resp = ollama.chat(
     model='mistral',
