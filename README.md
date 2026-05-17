@@ -117,12 +117,11 @@ claude-mirror/
 python3 onboarding.py
 ```
 
-This asks you 5 quick questions:
+This asks you 4 quick questions:
 1. Your name
-2. Your mother tongue / first language
-3. Your profession (max 60 characters)
-4. Your current top goal (max 100 characters)
-5. Time period to analyse (3 months / 6 months / 12 months / all data)
+2. Your profession (max 60 characters)
+3. Your current top goal (max 100 characters)
+4. Time period to analyse (3 months / 6 months / 12 months / all data)
 
 Takes under 2 minutes. Saves to `config.json` locally.
 

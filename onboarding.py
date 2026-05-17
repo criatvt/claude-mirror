@@ -33,7 +33,6 @@ def run():
     print("\nLet's personalise your report.\n")
 
     name = ask("Your name")
-    mother_tongue = ask("Your mother tongue (e.g. Tamil, Hindi, Bengali)")
     profession = ask("Your profession in one line (max 60 characters)", max_chars=60)
     goal = ask("Your current top goal in one line (max 100 characters)", max_chars=100)
     period = ask(
@@ -58,7 +57,6 @@ def run():
 
     config = {
         "name": name,
-        "mother_tongue": mother_tongue,
         "profession": profession,
         "goal": goal,
         "period_label": period,

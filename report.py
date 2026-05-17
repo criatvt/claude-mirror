@@ -314,7 +314,6 @@ restatement. Prefer one sharp sentence over three soft ones.
 
 ABOUT THIS PERSON:
 - Name: {name}
-- Mother tongue: {config['mother_tongue']}
 - Profession: {config['profession']}
 - Current top goal: {config['goal']}
 - Period analysed: {config.get('period', config.get('period_label', 'All available data'))}
