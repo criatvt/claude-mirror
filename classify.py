@@ -9,6 +9,9 @@ CONFIG_PATH = os.path.join(BASE, 'config.json')
 DATA_PATH = os.path.join(BASE, 'data', 'conversations.json')
 SAVE_PATH = os.path.join(BASE, 'classified.csv')
 
+CONTEXT_BUDGET = 10000
+SAMPLE_N = 10
+
 # ── Load config ───────────────────────────────────────────────────────────────
 if not os.path.exists(CONFIG_PATH):
     print("Run onboarding first: python3 onboarding.py")
@@ -64,18 +67,38 @@ def get_conv_meta(conv, platform):
     return '', 'Untitled', '', ''
 
 def build_context(conv, platform):
+    """Strategy C: send the full user-message text when it fits within
+    CONTEXT_BUDGET characters; fall back to stratified sampling for long
+    conversations so topic drift is still visible to the classifier."""
     uuid, name, created, updated = get_conv_meta(conv, platform)
     msgs = get_messages(conv, platform)
     total = len(conv.get('chat_messages', conv.get('mapping', {})))
-    first = msgs[:3]
-    last = msgs[-2:] if len(msgs) > 3 else []
-    ctx = f"Title: {name}\nTotal messages: {total}\n\nFirst messages:\n"
-    for i, m in enumerate(first):
-        ctx += f"{i+1}. {get_text(m, platform)[:400]}\n"
-    if last:
-        ctx += "\nLast messages:\n"
-        for i, m in enumerate(last):
-            ctx += f"{i+1}. {get_text(m, platform)[:400]}\n"
+
+    texts = [get_text(m, platform).strip() for m in msgs]
+    texts = [t for t in texts if t]
+    n = len(texts)
+
+    if n == 0:
+        return uuid, name, created, updated, total, f"Title: {name}\nTotal messages: {total}\n\n(no user text)"
+
+    full_body = '\n\n'.join(f"[{i+1}] {t}" for i, t in enumerate(texts))
+
+    if len(full_body) <= CONTEXT_BUDGET:
+        body = full_body
+        coverage = f"full ({n} messages)"
+    elif n <= SAMPLE_N:
+        # Few but very long messages — truncate each proportionally
+        per_msg = max(200, CONTEXT_BUDGET // n)
+        body = '\n\n'.join(f"[{i+1}] {t[:per_msg]}" for i, t in enumerate(texts))
+        coverage = f"truncated ({n} messages, ~{per_msg} chars each)"
+    else:
+        # Stratified sample: SAMPLE_N evenly-spaced messages across the arc
+        indices = sorted({int(i * (n - 1) / (SAMPLE_N - 1)) for i in range(SAMPLE_N)})
+        per_msg = max(200, CONTEXT_BUDGET // len(indices))
+        body = '\n\n'.join(f"[{idx+1}/{n}] {texts[idx][:per_msg]}" for idx in indices)
+        coverage = f"sampled ({len(indices)} of {n} messages, ~{per_msg} chars each)"
+
+    ctx = f"Title: {name}\nTotal user messages: {n} (coverage: {coverage})\n\nMessages:\n{body}"
     return uuid, name, created, updated, total, ctx
 
 PROMPT = """Classify this AI conversation into exactly one Layer 1 and one Layer 2 category.
