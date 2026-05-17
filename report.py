@@ -248,6 +248,63 @@ l2 = {cat: df[df['layer1'] == cat]['layer2'].value_counts().head(5).to_dict()
 monthly_str = {str(k.date()): int(v) for k, v in df.groupby('month_dt').size().items()}
 longest = df.nlargest(3, 'message_count')[['name','message_count','layer1']].to_dict('records')
 
+# ── Per-category themes & sample summaries (issue #9) ─────────────────────────
+from collections import Counter
+
+has_summary = 'summary' in df.columns
+has_themes = 'key_themes' in df.columns
+
+if not (has_summary and has_themes):
+    print("  ⚠ classified.csv is missing 'summary'/'key_themes' columns — "
+          "re-run classify.py to enrich the brief with specific themes.")
+
+themes_per_cat = {}
+samples_per_cat = {}
+
+for cat in LAYER1_ORDER:
+    sub = df[df['layer1'] == cat]
+    if len(sub) == 0:
+        continue
+
+    if has_themes:
+        counter = Counter()
+        for raw in sub['key_themes'].dropna().tolist():
+            for t in str(raw).split(';'):
+                t = t.strip().lower()
+                if t:
+                    counter[t] += 1
+        top = [t for t, _ in counter.most_common(6)]
+        if top:
+            themes_per_cat[cat] = top
+
+    if has_summary:
+        # Prefer summaries from the longest conversations in each category
+        ordered = sub.sort_values('message_count', ascending=False)
+        picks = []
+        for s in ordered['summary'].dropna().tolist():
+            s = str(s).strip()
+            if s and s.lower() not in ('nan', 'none') and s not in picks:
+                picks.append(s)
+            if len(picks) >= 4:
+                break
+        if picks:
+            samples_per_cat[cat] = picks
+
+if themes_per_cat:
+    themes_block = '\n'.join(f"- {cat}: {', '.join(ts)}" for cat, ts in themes_per_cat.items())
+else:
+    themes_block = "(no theme data — classified.csv predates the summary/key_themes columns)"
+
+if samples_per_cat:
+    sample_lines = []
+    for cat, picks in samples_per_cat.items():
+        sample_lines.append(f"- {cat}:")
+        for s in picks:
+            sample_lines.append(f"    • {s}")
+    samples_block = '\n'.join(sample_lines)
+else:
+    samples_block = "(no per-conversation summaries — re-run classify.py to enable)"
+
 BRIEF_PROMPT = f"""You are a personal intelligence coach analysing how someone uses AI.
 Write a deeply insightful personal intelligence brief in Markdown.
 
@@ -278,6 +335,17 @@ MONTHLY VOLUME:
 
 TOP 3 LONGEST CONVERSATIONS:
 {json.dumps(longest, indent=2)}
+
+COMMON THEMES PER CATEGORY (derived from per-conversation key_themes):
+{themes_block}
+
+SAMPLE CONVERSATIONS PER CATEGORY (verbatim summaries — what these conversations actually look like):
+{samples_block}
+
+When discussing patterns, cite specific recurring themes and conversation
+examples from the data above. Do not rely only on category counts — name the
+real topics (e.g., "react performance", "pricing models") and reference what
+the conversations were about.
 
 Write these exact sections in Markdown:
 
