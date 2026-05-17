@@ -381,6 +381,23 @@ the conversations were about.
 The brief has TWO layers. Write them in this exact order, with the exact
 separator line shown.
 
+PULL-QUOTE MARKING — VERY IMPORTANT:
+EVERY section below is **flowing prose** — never bulleted lists, never
+numbered lists. Each section opens with its sharpest sentence wrapped in
+`[[hl]]` and `[[/hl]]` markers, then 1-2 sentences of supporting context.
+
+The markers are LITERAL strings: open with two square brackets, then `hl`,
+then two square brackets. Close with two square brackets, slash, `hl`, two
+square brackets. Like this skeleton (do NOT copy the words, only the shape):
+
+## <section title>
+[[hl]]<the sharpest single sentence for this section>[[/hl]]
+<1-2 sentences of supporting prose>
+
+Exactly one pull-quote pair per section. Both opening AND closing markers
+must be present and well-formed. Do NOT use bullets (- or *) or numbered
+lists (1. 2. 3.) anywhere in the brief.
+
 PART A — OBSERVATIONS FROM YOUR DATA
 Part A must be specific even if the user's stated goal is generic or vague.
 HARD RULE: in Part A, do NOT mention the goal, do NOT use the words "goal",
@@ -400,8 +417,10 @@ What this pattern reveals about how they think and work.
 **Cap: ≤ 70 words.**
 
 ## What stood out
-What is unexpected or counterintuitive in this data.
-**Cap: ≤ 3 bullets, ≤ 25 words each.**
+What is unexpected or counterintuitive in this data. Flowing prose, NOT a
+bulleted list. Open with the pull-quote sentence, then add 1-2 sentences of
+supporting context.
+**Cap: ≤ 75 words.**
 
 ## One uncomfortable truth
 One uncomfortable but important thing the data reveals.
@@ -418,11 +437,16 @@ filler. Open Part B with the italic label below.
 
 ## What's missing
 What they are NOT using AI for that someone with their goal should be.
-**Cap: ≤ 3 bullets, ≤ 25 words each.**
+Flowing prose, NOT a bulleted list. Open with the pull-quote sentence,
+then 1-2 sentences of supporting context.
+**Cap: ≤ 75 words.**
 
 ## Worth trying
-Specific recommendations tied to their profession and goal. No corporate verbs.
-**Cap: ≤ 3 numbered items, ≤ 30 words each.**
+Specific recommendations tied to their profession and goal. No corporate
+verbs. Flowing prose, NOT a numbered list. Open with the pull-quote
+sentence naming the strongest recommendation, then 1-2 sentences of
+supporting context (which may name secondary recommendations inline).
+**Cap: ≤ 95 words.**
 
 ## Where this is heading
 Where their usage is going if they continue on this path.
@@ -430,20 +454,88 @@ Where their usage is going if they continue on this path.
 
 Be direct, specific, intelligent. No generic advice. British English.
 
-Before finishing, reread your draft. If any section exceeds its cap or the
-total exceeds 600 words, trim it. Do NOT drop a section to stay under the cap —
-every section above must appear. Do NOT include the "Cap:" lines or the
-"PART A"/"PART B" instruction blocks in your output; they are instructions to
-you, not part of the brief. Emit only the italic labels, the `---` separator,
-and the section headers."""
+Before finishing, reread your draft. Check that:
+1. Every section is within its cap.
+2. Total is within 600 words.
+3. EVERY section contains exactly one `[[hl]]...[[/hl]]` pull-quote marker.
+   If any section is missing one, add it now around its sharpest sentence.
+4. The "Cap:" lines, the "PART A"/"PART B" instruction blocks, and the
+   "PULL-QUOTE MARKING" instructions are NOT in your output — those are
+   instructions to you, not part of the brief.
+
+Emit only the italic labels, the `---` separator, the section headers, the
+prose, and the `[[hl]]...[[/hl]]` markers."""
 
 resp = ollama.chat(
     model='mistral',
     messages=[{'role': 'user', 'content': BRIEF_PROMPT}],
     options={'num_predict': 3000, 'temperature': 0.7}
 )
-brief_md   = resp['message']['content']
-brief_html = markdown.markdown(brief_md, extensions=['extra'])
+brief_md_raw = resp['message']['content']
+
+# ── Pull-quote post-processing (#6) ───────────────────────────────────────────
+# Model is instructed to mark one sentence per section with [[hl]]...[[/hl]].
+# Small local models often skip the instruction, so we fall back to an
+# algorithmic marker pass that wraps the longest sentence in each section.
+# In HTML the markers become styled pull-quote blocks (New Yorker convention).
+# In Markdown they become blockquote+italic for clean rendering on GitHub.
+import re as _re_hl
+
+# Tolerant marker pattern — accepts the model's occasional single-bracket
+# slips (`[hl]` / `[/hl]`) as well as the canonical double-bracket form.
+_hl_pattern = _re_hl.compile(
+    r'\[{1,2}hl\]{1,2}(.+?)\[{1,2}/hl\]{1,2}', _re_hl.DOTALL
+)
+# Stragglers that survive substitution (e.g. unmatched opening or closing)
+_hl_straggler = _re_hl.compile(r'\[{1,2}/?hl\]{1,2}')
+
+
+def _add_fallback_pullquotes(md):
+    """If a section has no [[hl]] markers, wrap its longest prose sentence.
+    Skips list items (bulleted, numbered) and blockquotes so the marker
+    never ends up nested inside an <li>."""
+    parts = _re_hl.split(r'(?m)^(##\s.+)$', md)
+    if len(parts) < 3:
+        return md
+    list_or_quote = _re_hl.compile(r'^\s*([-*•]|\d+[.)]|>)')
+    out = [parts[0]]
+    for i in range(1, len(parts), 2):
+        heading = parts[i]
+        body = parts[i + 1] if (i + 1) < len(parts) else ''
+        if '[[hl]]' in body:
+            out.extend([heading, body]); continue
+        # Filter body to prose lines only — drop bullets, numbered items, quotes
+        prose_only = '\n'.join(
+            ln for ln in body.split('\n') if not list_or_quote.match(ln)
+        )
+        candidates = _re_hl.findall(r'[A-Z][^.!?]*[.!?](?=\s|$)', prose_only)
+        candidates = [c.strip() for c in candidates if len(c.strip()) > 30]
+        if not candidates:
+            out.extend([heading, body]); continue
+        longest = max(candidates, key=len)
+        body = body.replace(longest, f'[[hl]]{longest}[[/hl]]', 1)
+        out.extend([heading, body])
+    return ''.join(out)
+
+
+brief_md_raw = _add_fallback_pullquotes(brief_md_raw)
+
+# Markdown export — turn marker into a blockquote line
+brief_md = _hl_pattern.sub(lambda m: f'\n\n> *{m.group(1).strip()}*\n\n', brief_md_raw)
+# Strip any unmatched marker stragglers from the markdown
+brief_md = _hl_straggler.sub('', brief_md)
+
+# HTML — render markdown first (with markers intact), then replace markers
+# with a styled blockquote that breaks out of the current <p> cleanly.
+_html_pre = markdown.markdown(brief_md_raw, extensions=['extra'])
+def _hl_to_card(m):
+    text = m.group(1).strip()
+    return f'</p><blockquote class="hl-card">{text}</blockquote><p>'
+brief_html = _hl_pattern.sub(_hl_to_card, _html_pre)
+# Strip any unmatched marker stragglers from the HTML too
+brief_html = _hl_straggler.sub('', brief_html)
+# Clean up any empty paragraphs the substitution may have produced
+brief_html = _re_hl.sub(r'<p>\s*</p>', '', brief_html)
 print("  ✓ Brief generated")
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
@@ -644,6 +736,16 @@ body {{
   padding: 6px 0 6px 20px;
   color: #6B5D4A;
   font-style: italic;
+}}
+.brief-wrap .hl-card {{
+  font-size: 1.55em;
+  line-height: 1.35;
+  font-style: italic;
+  color: #B85A3D;
+  border-left: 3px solid #B85A3D;
+  margin: 28px 0;
+  padding: 12px 0 12px 28px;
+  font-weight: 500;
 }}
 /* Drop cap on the first paragraph after the first h2 in the brief */
 .brief-wrap h2:first-of-type + p::first-letter {{
