@@ -18,7 +18,7 @@ One scrollable HTML report containing:
 - **Conversation depth** — how deep your sessions go
 - **Category trends** — how your usage has shifted over time
 - **Word cloud** — what topics dominate your conversations
-- **Personal brief** — AI-generated coaching insights, surprises, blind spots, and suggestions
+- **The Mirror** — a thoughtful read of your data, generated locally: the story so far, what stood out, what's missing, what's worth trying
 
 Plus a `report.md` — the same content in Markdown, designed to be reused, versioned, and pasted into future AI conversations.
 
@@ -86,7 +86,37 @@ You should see `(venv)` in your terminal prompt.
 pip install -r requirements.txt
 ```
 
-### Step 4 — Pull the Mistral model
+### Step 4 — Install Ollama
+
+Ollama is the local model runtime — it's what keeps everything offline.
+
+**macOS:**
+```bash
+brew install ollama
+```
+Or download the `.dmg` from [ollama.com/download](https://ollama.com/download).
+
+**Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**Windows:**
+Download the installer from [ollama.com/download](https://ollama.com/download).
+
+After installing, start the Ollama service (it usually starts automatically; if not):
+```bash
+ollama serve
+```
+Leave it running in a separate terminal window for the rest of the setup.
+
+Verify it's reachable:
+```bash
+curl http://localhost:11434/api/tags
+```
+You should get a JSON response (an empty model list is fine — that means it's running).
+
+### Step 5 — Pull the Mistral model
 ```bash
 ollama pull mistral
 ```
@@ -125,34 +155,27 @@ This asks you 4 quick questions:
 
 Takes under 2 minutes. Saves to `config.json` locally.
 
-### Step 3 — Inspect your data
-```bash
-python3 analyse.py
-```
-
-Shows you total conversations, date range, monthly breakdown, and platform detected. No AI used here — just fast data inspection.
-
-### Step 4 — Classify conversations
+### Step 3 — Classify conversations
 ```bash
 python3 classify.py
 ```
 
 Sends each conversation to Mistral (running locally) for classification.
-- **Time:** 20–40 minutes depending on conversation count
+- **Time:** roughly 1–3 seconds per conversation. A few hundred conversations classify in a few minutes.
 - **Progress:** Live progress bar
 - **Resumable:** If interrupted, run again — it picks up where it left off
 - **Output:** `classified.csv`
 
-### Step 5 — Generate your report
+### Step 4 — Generate your report
 ```bash
 python3 report.py
 ```
 
 Generates all charts and your personal brief.
-- **Time:** ~5 minutes
+- **Time:** under a minute for the charts, plus ~30 seconds for the brief
 - **Output:** `output/report.html` and `output/report.md`
 
-### Step 6 — Open your report
+### Step 5 — Open your report
 ```bash
 open output/report.html
 ```
@@ -195,9 +218,8 @@ claude-mirror/
 │   └── report.md              ← Your report (Markdown, reusable)
 ├── venv/                      ← Python virtual environment
 ├── onboarding.py              ← Step 1: setup
-├── analyse.py                 ← Step 2: inspect data
-├── classify.py                ← Step 3: classify conversations
-├── report.py                  ← Step 4: generate report
+├── classify.py                ← Step 2: classify conversations
+├── report.py                  ← Step 3: generate report
 ├── config.json                ← Your saved onboarding answers
 ├── classified.csv             ← Classification results
 ├── requirements.txt
@@ -262,15 +284,19 @@ Contributions welcome. If you're adding support for a new AI platform:
 
 ## Roadmap
 
-**V1 (current)**
+**Today**
 - Claude, ChatGPT, Gemini support
-- 8 charts + personal brief
+- 8 charts + The Mirror (personal reflection)
 - Single HTML report
-- Fully local
+- Fully local — no cloud calls, no telemetry
 
-**V2 (planned)**
-- Browser-based UI — no terminal needed
-- Quarter-on-quarter comparison
+**In flight** *(see [issue #14](https://github.com/criatvt/claude-mirror/issues/14) for the live tracker)*
+- Tighter brief — verbosity caps, two-layer structure, real conversation citations
+- Deeper classification — full-conversation reading, per-conversation summaries
+- Quarter-on-quarter comparison as a "predictive personal-tracking ritual"
+- Configurable local model (drop-in replacement for Mistral)
+
+The project stays terminal-driven and single-HTML-report by design — privacy and screenshot-shareability are non-negotiable.
 
 ---
 
