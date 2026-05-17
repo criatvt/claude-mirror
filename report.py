@@ -32,21 +32,31 @@ name = config['name']
 print(f"\n  Claude Mirror\n  Generating report for {name}...\n")
 
 # ── Design System ─────────────────────────────────────────────────────────────
-BG        = '#F8F5F0'
+# Editorial / New Yorker register — typography-led, light mode, serif body.
+# Watercolour-muted earthtones throughout. Terracotta carries the visual
+# hierarchy. Body text uses warm-black; charts use deep walnut (never pure
+# black) so the eye reads ink-on-paper, not data-on-screen.
+BG        = '#FBFAF6'   # warm white — fresh-paper cream
 WHITE     = '#FFFFFF'
-PRUSSIAN  = '#003153'
-UMBER     = '#5C4033'
-VERDIGRIS = '#43B5A0'
+INK       = '#1E1A14'   # warm-black body text
+CHART_DEEP = '#3D2E20'  # deep walnut — chart anchor, never pure black
+MUTED     = '#6B5D4A'   # captions, eyebrows, footer
+HAIRLINE  = '#E5DFD0'   # card borders, dividers
+TERRACOTTA = '#B85A3D'  # accent — hero rule, italic wordmark, stat numbers
+# Legacy aliases kept for matplotlib rcParams below
+PRUSSIAN  = INK
+UMBER     = MUTED
+VERDIGRIS = TERRACOTTA
 
 PALETTE = [
-    '#003153',
-    '#43B5A0',
-    '#C17817',
-    '#8B3A62',
-    '#2E6B8A',
-    '#5C4033',
-    '#4A7C59',
-    '#A0522D',
+    '#3D2E20',   # deep walnut
+    '#B85A3D',   # terracotta
+    '#708C6B',   # sage
+    '#C89B5E',   # ochre
+    '#7A4458',   # plum
+    '#5C8A8B',   # teal
+    '#9B5836',   # rust
+    '#4F5E3F',   # moss
 ]
 
 LAYER1_ORDER = ['Writing', 'Strategy', 'Learning', 'Creative',
@@ -117,48 +127,63 @@ def fig_to_b64(fig):
 charts = {}
 
 # Chart 1 — Donut
-fig, ax = plt.subplots(figsize=(7, 7), facecolor=BG)
+fig, ax = plt.subplots(figsize=(8, 8), facecolor=BG)
 counts = df['layer1'].value_counts()
-wedges, texts, autotexts = ax.pie(
-    counts.values, labels=counts.index,
-    autopct='%1.1f%%', colors=PALETTE[:len(counts)],
+donut_total = int(counts.sum())
+wedges, _texts, autotexts = ax.pie(
+    counts.values,
+    autopct=lambda p: f'{p:.0f}%' if p >= 6 else '',
+    colors=PALETTE[:len(counts)],
     wedgeprops={'width': 0.55, 'edgecolor': BG, 'linewidth': 3},
     pctdistance=0.78, startangle=90)
-for t in texts:     t.set_fontsize(11); t.set_fontweight('bold')
-for a in autotexts: a.set_fontsize(9)
-ax.set_title('Overall Distribution', fontsize=15, fontweight='bold', color=PRUSSIAN, pad=20)
+for a in autotexts:
+    a.set_fontsize(10); a.set_fontweight('bold'); a.set_color(BG)
+ax.set_title('Overall Distribution', fontsize=15, fontweight='bold', color=PRUSSIAN, pad=16)
+legend_labels = [f'{cat}  ·  {cnt}  ({cnt/donut_total*100:.1f}%)'
+                 for cat, cnt in counts.items()]
+ax.legend(wedges, legend_labels, loc='upper center',
+          bbox_to_anchor=(0.5, -0.02), ncol=2, frameon=False, fontsize=10,
+          handlelength=1.4, columnspacing=2.4, handletextpad=0.8)
+plt.tight_layout()
 charts['donut'] = fig_to_b64(fig)
 print("  ✓ Chart 1: Donut")
 
-# Chart 2 — Monthly volume
+# Chart 2 — Monthly volume (categorical x-axis so bars don't overflow on short ranges)
 fig, ax = plt.subplots(figsize=(14, 5), facecolor=BG)
 monthly = df.groupby('month_dt').size().reset_index(name='count')
-bars = ax.bar(monthly['month_dt'], monthly['count'], color=PRUSSIAN, alpha=0.85, width=20, zorder=3)
+month_labels = [d.strftime('%b %Y') for d in monthly['month_dt']]
+bar_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(monthly)) / 12))
+bars = ax.bar(month_labels, monthly['count'], color=PRUSSIAN, alpha=0.85,
+              width=bar_width, zorder=3)
 for bar in bars:
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
-            str(int(bar.get_height())), ha='center', va='bottom', fontsize=8, color=PRUSSIAN)
+            str(int(bar.get_height())), ha='center', va='bottom', fontsize=9, color=PRUSSIAN)
 ax.set_title('Conversations Per Month', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
-plt.xticks(rotation=45, ha='right'); plt.tight_layout()
+plt.xticks(rotation=45 if len(monthly) > 4 else 0, ha='right' if len(monthly) > 4 else 'center')
+plt.tight_layout()
 charts['monthly'] = fig_to_b64(fig)
 print("  ✓ Chart 2: Monthly volume")
 
-# Chart 3 — Stacked monthly
+# Chart 3 — Stacked monthly (categorical x-axis matches Chart 2)
 fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
 pivot = df.groupby(['month_dt', 'layer1']).size().unstack(fill_value=0)
 pivot = pivot.reindex(columns=LAYER1_ORDER, fill_value=0)
+stack_labels = [d.strftime('%b %Y') for d in pivot.index]
+stack_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(pivot)) / 12))
 bottom = np.zeros(len(pivot))
 for i, col in enumerate(pivot.columns):
     vals = pivot[col].values
-    ax.bar(pivot.index, vals, bottom=bottom, label=col,
-           color=PALETTE[i], width=20, alpha=0.9, zorder=3)
+    ax.bar(stack_labels, vals, bottom=bottom, label=col,
+           color=PALETTE[i], width=stack_width, alpha=0.9, zorder=3)
     bottom += vals
 ax.set_title('Topic Mix Over Time', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
 ax.legend(loc='upper left', fontsize=9, framealpha=0.9)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
-plt.xticks(rotation=45, ha='right'); plt.tight_layout()
+plt.xticks(rotation=45 if len(pivot) > 4 else 0, ha='right' if len(pivot) > 4 else 'center')
+plt.tight_layout()
 charts['stacked'] = fig_to_b64(fig)
 print("  ✓ Chart 3: Stacked monthly")
 
@@ -431,125 +456,129 @@ html = f"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{name} — Claude Mirror</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{
-  font-family: Georgia, 'Times New Roman', serif;
-  background: #F8F5F0;
-  color: #003153;
-  line-height: 1.75;
-  font-size: 16px;
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  background: #FBFAF6;
+  color: #1E1A14;
+  line-height: 1.55;
+  font-size: 18px;
 }}
+.container {{
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 72px 60px;
+}}
+/* ─── Hero: typography-led, light page, no colour block ─── */
 .hero {{
-  background: #003153;
-  padding: 72px 56px 60px;
+  padding: 8px 0 64px;
+  border-bottom: 1px solid #1E1A14;
+  margin-bottom: 72px;
 }}
-.hero-badge {{
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(248,245,240,0.12);
-  color: #F8F5F0;
-  border: 1px solid rgba(248,245,240,0.25);
-  border-radius: 100px;
-  padding: 5px 14px;
-  font-size: 0.78em;
+.hero-rule {{
+  width: 56px;
+  height: 3px;
+  background: #B85A3D;
   margin-bottom: 32px;
 }}
 .hero-eyebrow {{
-  font-size: 0.8em;
-  letter-spacing: 3px;
+  font-size: 0.7em;
+  letter-spacing: 5px;
   text-transform: uppercase;
-  color: #43B5A0;
-  margin-bottom: 12px;
+  color: #6B5D4A;
+  margin-bottom: 20px;
+  font-weight: 500;
 }}
 .hero h1 {{
-  font-size: 3.2em;
-  font-weight: bold;
-  color: #F8F5F0;
-  letter-spacing: -1px;
-  line-height: 1.1;
-  margin-bottom: 10px;
+  font-size: 4.4em;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -1.5px;
+  margin: 0 0 4px;
+  color: #1E1A14;
 }}
-.hero h1 span {{ color: #43B5A0; }}
+.hero h1 span {{ color: #B85A3D; font-style: italic; font-weight: 500; }}
 .hero-meta {{
-  color: rgba(248,245,240,0.6);
   font-size: 0.88em;
-  margin-bottom: 48px;
+  color: #6B5D4A;
   font-style: italic;
+  margin: 28px 0 40px;
+  max-width: 720px;
 }}
 .stats-row {{
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 48px;
 }}
 .stat-card {{
-  background: rgba(248,245,240,0.08);
-  border: 1px solid rgba(248,245,240,0.18);
-  border-radius: 12px;
-  padding: 18px 22px;
-  min-width: 120px;
+  background: none;
+  border: none;
+  padding: 0;
+  min-width: 0;
 }}
 .stat-number {{
-  font-size: 2em;
-  font-weight: bold;
-  color: #43B5A0;
+  font-size: 2.4em;
+  font-weight: 600;
+  color: #B85A3D;
   display: block;
   line-height: 1;
+  font-feature-settings: "lnum";
 }}
 .stat-label {{
-  font-size: 0.72em;
-  color: rgba(248,245,240,0.6);
+  font-size: 0.6em;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-top: 6px;
+  color: #6B5D4A;
+  margin-top: 8px;
   display: block;
 }}
-.container {{
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 72px 56px;
-}}
+/* ─── Sections ─── */
 .section {{ margin-bottom: 80px; }}
 .section-eyebrow {{
-  font-size: 0.75em;
-  letter-spacing: 3px;
+  font-size: 0.68em;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  color: #5C4033;
+  color: #6B5D4A;
   margin-bottom: 8px;
 }}
 .section-title {{
-  font-size: 1.9em;
-  font-weight: bold;
-  color: #003153;
-  letter-spacing: -0.5px;
-  margin-bottom: 8px;
+  font-size: 2.4em;
+  font-weight: 600;
+  margin: 0 0 8px;
+  line-height: 1.05;
+  letter-spacing: -0.8px;
+  color: #1E1A14;
 }}
 .section-desc {{
-  color: #5C4033;
-  font-size: 0.93em;
-  margin-bottom: 28px;
+  color: #6B5D4A;
   font-style: italic;
+  font-size: 1.06em;
+  margin: 0 0 36px;
+  max-width: 640px;
 }}
+/* ─── Cards ─── */
 .card {{
   background: #FFFFFF;
-  border: 1px solid #DDD8D0;
-  border-radius: 16px;
-  padding: 24px;
+  border: 1px solid #E5DFD0;
+  border-radius: 0;
+  padding: 36px;
   margin-bottom: 24px;
 }}
 .card img {{
   width: 100%;
-  border-radius: 8px;
   display: block;
 }}
 .card-note {{
-  font-size: 0.82em;
-  color: #5C4033;
+  font-size: 0.78em;
+  color: #6B5D4A;
   font-style: italic;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid #EDE9E4;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #EFE6CE;
 }}
 .grid-2 {{
   display: grid;
@@ -558,80 +587,102 @@ body {{
 }}
 .divider {{
   height: 1px;
-  background: #DDD8D0;
+  background: #E5DFD0;
   margin: 64px 0;
 }}
+/* ─── Brief ─── */
 .brief-wrap {{
   background: #FFFFFF;
-  border: 1px solid #DDD8D0;
-  border-left: 4px solid #003153;
-  border-radius: 0 16px 16px 0;
-  padding: 48px;
+  border: 1px solid #E5DFD0;
+  border-left: 4px solid #B85A3D;
+  border-radius: 0;
+  padding: 40px 44px;
 }}
 .brief-wrap h2 {{
-  font-size: 1.3em;
-  font-weight: bold;
-  color: #003153;
-  margin-top: 40px;
-  margin-bottom: 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #EDE9E4;
+  font-size: 1.5em;
+  font-weight: 600;
+  color: #1E1A14;
+  margin: 36px 0 14px;
+  line-height: 1.2;
+  padding: 0;
+  border: none;
 }}
-.brief-wrap h2:first-child {{ margin-top: 0; }}
+.brief-wrap h2:first-of-type {{ margin-top: 8px; }}
 .brief-wrap p {{
-  color: #1a1a1a;
+  color: #1E1A14;
   margin-bottom: 16px;
-  line-height: 1.85;
+  line-height: 1.7;
+  font-size: 1.0em;
 }}
 .brief-wrap ul, .brief-wrap ol {{
   padding-left: 24px;
   margin-bottom: 16px;
 }}
 .brief-wrap li {{
-  color: #1a1a1a;
+  color: #1E1A14;
   margin-bottom: 8px;
-  line-height: 1.75;
+  line-height: 1.7;
 }}
-.brief-wrap strong {{ color: #5C4033; }}
+.brief-wrap strong {{ color: #6B5D4A; }}
 .brief-wrap hr {{
   border: 0;
-  border-top: 1px solid #DDD8D0;
-  margin: 40px 0 28px;
+  border-top: 1px solid #E5DFD0;
+  margin: 32px 0 24px;
 }}
 .brief-wrap p > em:only-child {{
   display: block;
-  color: #5C4033;
-  font-size: 0.82em;
-  letter-spacing: 2px;
+  color: #6B5D4A;
+  font-size: 0.7em;
+  letter-spacing: 3px;
   text-transform: uppercase;
   font-style: normal;
   margin: 4px 0 12px;
 }}
+.brief-wrap blockquote {{
+  border-left: 2px solid #C89B5E;
+  margin: 18px 0;
+  padding: 6px 0 6px 20px;
+  color: #6B5D4A;
+  font-style: italic;
+}}
+/* Drop cap on the first paragraph after the first h2 in the brief */
+.brief-wrap h2:first-of-type + p::first-letter {{
+  font-size: 3.6em;
+  line-height: 0.85;
+  float: left;
+  margin: 6px 10px 0 0;
+  font-weight: 600;
+  color: #B85A3D;
+  font-style: italic;
+}}
 .footer {{
   text-align: center;
   padding: 40px 20px;
-  border-top: 1px solid #DDD8D0;
-  color: #5C4033;
+  border-top: 1px solid #E5DFD0;
+  color: #6B5D4A;
   font-size: 0.85em;
   font-style: italic;
-  background: #F8F5F0;
+  background: #FBFAF6;
 }}
-.footer a {{ color: #003153; text-decoration: none; }}
+.footer a {{ color: #B85A3D; text-decoration: none; }}
 @media (max-width: 768px) {{
-  .hero {{ padding: 40px 24px; }}
-  .hero h1 {{ font-size: 2em; }}
   .container {{ padding: 48px 24px; }}
+  .hero h1 {{ font-size: 2.6em; }}
+  .section-title {{ font-size: 1.9em; }}
   .grid-2 {{ grid-template-columns: 1fr; }}
   .brief-wrap {{ padding: 28px; }}
+  .stats-row {{ gap: 28px; }}
 }}
 </style>
 </head>
 <body>
 
+<div class="container">
+
 <div class="hero">
-  <div class="hero-badge">&#128274; Generated locally &nbsp;&middot;&nbsp; No data left your machine</div>
-  <p class="hero-eyebrow">Claude Mirror &nbsp;&middot;&nbsp; AI Usage Report</p>
-  <h1>{name}'s<br><span>AI Mirror</span></h1>
+  <div class="hero-rule"></div>
+  <p class="hero-eyebrow">Claude Mirror &nbsp;&middot;&nbsp; A Personal Reflection</p>
+  <h1>{name}'s <span>AI&nbsp;Mirror</span></h1>
   <p class="hero-meta">{config.get('period', config.get('period_label', 'All available data'))} &nbsp;&middot;&nbsp; {date_min} &rarr; {date_max} &nbsp;&middot;&nbsp; Generated {now_str} &nbsp;&middot;&nbsp; Times in {TZ_LABEL}</p>
   <div class="stats-row">
     <div class="stat-card"><span class="stat-number">{total}</span><span class="stat-label">Conversations</span></div>
@@ -642,8 +693,6 @@ body {{
     <div class="stat-card"><span class="stat-number">{common_day[:3]}</span><span class="stat-label">Most Active Day</span></div>
   </div>
 </div>
-
-<div class="container">
 
   <div class="section">
     <p class="section-eyebrow">Your Usage Story</p>

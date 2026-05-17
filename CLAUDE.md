@@ -47,15 +47,21 @@ Always normalise to user-messages-only before analysis.
 
 ## Styling
 
-Professional serif aesthetic, light mode:
-- Background: `#F5F0E8` (warm off-white)
-- Text: `#1B2A3B` (dark navy)
-- Primary accent: `#003153` (Prussian Blue)
-- Chart palette: Prussian Blue gradient, muted and desaturated
-- Font: Cormorant Garamond (headings), serif body
-- Charts: warm off-white background, clean gridlines, no saturated colours
+New Yorker / editorial serif aesthetic, light mode, typography-led:
+- Background: `#FBFAF6` (warm white — fresh paper)
+- Body text (ink): `#1E1A14` (warm-black)
+- Chart anchor: `#3D2E20` (deep walnut — used in charts in place of pure black)
+- Accent: `#B85A3D` (terracotta — hero rule, italic wordmark, stat numbers, brief left-border)
+- Muted: `#6B5D4A` (captions, eyebrows, footer)
+- Hairline: `#E5DFD0` (card borders, dividers)
+- Chart palette: 8-tone watercolour-muted earthtones in `report.py:46-55` (walnut, terracotta, sage, ochre, plum, teal, rust, moss)
+- Font: Cormorant Garamond (Google Fonts, falls back to Georgia offline) — both headings and body
+- Hero: typography-led, NOT a colour block — light page, dark serif title, italic terracotta wordmark
+- Cards: white paper, square corners, hairline border, lots of whitespace
+- Brief ("The Mirror"): white card with terracotta left-border, drop cap on first paragraph
 
 Do NOT change the aesthetic to Gen Z, high-contrast neon, or corporate flat design.
+The terracotta accent should appear *sparingly* — it carries the visual hierarchy, not the whole palette. Charts never use pure black (`#000`); use the walnut `#3D2E20` as the deepest tone.
 
 ---
 
