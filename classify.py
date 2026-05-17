@@ -17,6 +17,35 @@ CSV_COLUMNS = [
 CONTEXT_BUDGET = 10000
 SAMPLE_N = 10
 
+# Canonical taxonomy — the schema below enforces these via Ollama's JSON-schema
+# format constraint, so the model cannot emit out-of-set strings or typos.
+LAYER1_VALUES = ['Writing', 'Research', 'Coding', 'Strategy', 'Learning',
+                 'Creative', 'Personal', 'Admin']
+
+LAYER2_VALUES = [
+    'Drafting', 'Editing', 'Grammar', 'Feedback', 'Rewriting', 'Summarising',
+    'Fact finding', 'Competitive analysis', 'Policy analysis', 'Market research', 'Synthesis',
+    'Debugging', 'Building', 'Explanation', 'Review', 'Architecture',
+    'Brainstorming', 'Decision support', 'Planning', 'Frameworks', 'Evaluation',
+    'Concept explanation', 'How-to', 'Deep dive', 'Comparison',
+    'Fiction', 'Ideation', 'Worldbuilding', 'Scriptwriting',
+    'Reflection', 'Health', 'Life decisions', 'Relationships',
+    'Email', 'Formatting', 'Templates', 'Quick lookup',
+]
+
+RESPONSE_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'layer1':     {'type': 'string', 'enum': LAYER1_VALUES},
+        'layer2':     {'type': 'string', 'enum': LAYER2_VALUES},
+        'confidence': {'type': 'string', 'enum': ['high', 'medium', 'low']},
+        'summary':    {'type': 'string'},
+        'key_themes': {'type': 'array', 'items': {'type': 'string'},
+                       'minItems': 1, 'maxItems': 6},
+    },
+    'required': ['layer1', 'layer2', 'confidence', 'summary', 'key_themes'],
+}
+
 # ── Load config ───────────────────────────────────────────────────────────────
 if not os.path.exists(CONFIG_PATH):
     print("Run onboarding first: python3 onboarding.py")
@@ -110,10 +139,15 @@ def build_context(conv, platform):
     ctx = f"Title: {name}\nTotal user messages: {n} (coverage: {coverage})\n\nMessages:\n{body}"
     return uuid, name, created, updated, total, ctx
 
-PROMPT = """Classify this AI conversation into EXACTLY ONE Layer 1 category and
-EXACTLY ONE Layer 2 category, then summarise what it was actually about.
-Consider the whole arc — opening, middle, and closing — not just the first message.
-If the conversation spans multiple themes, pick the dominant one.
+PROMPT = """Classify this AI conversation. You MUST output exactly one of the
+allowed Layer 1 strings and exactly one of the allowed Layer 2 strings —
+character-for-character, no variations, no parentheticals, no typos, no
+combined values. The response format is enforced by a JSON schema; outputs
+outside the allowed sets will be rejected.
+
+Then summarise what the conversation was actually about. Consider the whole
+arc — opening, middle, and closing — not just the first message. If the
+conversation spans multiple themes, pick the dominant one.
 
 LAYER 1:
 - Writing (drafting, editing, feedback, grammar, rewriting)
@@ -145,10 +179,11 @@ KEY_THEMES: 2-4 short lowercase noun phrases or entities (e.g., "react",
 CONVERSATION:
 {context}
 
-Respond ONLY with valid JSON, no explanation, no markdown fences. `layer1` and
-`layer2` MUST be single strings (one category each), not lists or comma-joined.
-`key_themes` MUST be a JSON array of 2-4 short strings.
-{{"layer1": "Strategy", "layer2": "Planning", "confidence": "high|medium|low", "summary": "...", "key_themes": ["theme1", "theme2"]}}"""
+Respond ONLY with valid JSON matching this shape — no explanation, no markdown
+fences. `layer1` must be exactly one Layer 1 string from the list above;
+`layer2` must be exactly one Layer 2 string from the corresponding sub-list.
+`key_themes` is a JSON array of 2-4 short lowercase strings.
+{{"layer1": "Strategy", "layer2": "Planning", "confidence": "high", "summary": "...", "key_themes": ["theme1", "theme2"]}}"""
 
 # ── Classify ──────────────────────────────────────────────────────────────────
 results = []
@@ -171,7 +206,8 @@ for conv in tqdm(conversations, desc="Classifying"):
     try:
         response = ollama.chat(
             model='mistral',
-            messages=[{'role': 'user', 'content': PROMPT.format(context=context)}]
+            messages=[{'role': 'user', 'content': PROMPT.format(context=context)}],
+            format=RESPONSE_SCHEMA,
         )
         raw = response['message']['content'].strip()
         if '```' in raw:

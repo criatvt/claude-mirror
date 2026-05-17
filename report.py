@@ -49,25 +49,18 @@ PALETTE = [
     '#A0522D',
 ]
 
-REMAP = {
-    'Legal': 'Research',
-    'Health': 'Personal',
-    'Design (strategy, planning)': 'Strategy',
-    'Unknown': 'Admin',
-    'Strategry': 'Strategy',
-    'Finance (planning, calculations)': 'Strategy',
-    'Recruiting': 'Admin',
-    'Recommendation (Creative)': 'Creative',
-    'Recommendation (personalized, suggestions)': 'Strategy',
-    'Training': 'Learning',
-}
-
 LAYER1_ORDER = ['Writing', 'Strategy', 'Learning', 'Creative',
                 'Research', 'Coding', 'Personal', 'Admin']
 
 # ── Load & clean ──────────────────────────────────────────────────────────────
 df = pd.read_csv(CLASSIFIED_PATH)
-df['layer1'] = df['layer1'].replace(REMAP)
+# Surface stragglers from old CSVs (pre-schema runs may have out-of-taxonomy
+# values). With the schema in classify.py these should be zero on fresh runs.
+oot = df[~df['layer1'].isin(LAYER1_ORDER)]['layer1'].value_counts()
+if len(oot) > 0:
+    print(f"  ⚠ {oot.sum()} rows have out-of-taxonomy layer1 — re-run classify.py:")
+    for label, count in oot.items():
+        print(f"      {label!r}: {count}")
 df['created_at'] = pd.to_datetime(df['created_at'], utc=True)
 df['month_dt'] = df['created_at'].dt.to_period('M').dt.to_timestamp()
 df['hour'] = df['created_at'].dt.hour
