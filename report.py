@@ -350,10 +350,21 @@ examples from the data above. Do not rely only on category counts — name the
 real topics (e.g., "react performance", "pricing models") and reference what
 the conversations were about.
 
-Write these exact sections in Markdown, in this order, each within its cap:
+The brief has TWO layers. Write them in this exact order, with the exact
+separator line shown.
+
+PART A — OBSERVATIONS FROM YOUR DATA
+Part A must be specific even if the user's stated goal is generic or vague.
+HARD RULE: in Part A, do NOT mention the goal, do NOT use the words "goal",
+"objective", or "aspiration", and do NOT frame observations as relative to
+what the user is trying to achieve. Part A stands on what the data shows,
+nothing else. The goal exists only for Part B.
+Open Part A with the italic label below.
+
+*Part A — Observations from your data*
 
 ## The Story Your Data Tells
-Narrative of their usage arc. Specific numbers. Connect to their goal.
+Narrative of their usage arc. Specific numbers. Do not reference the goal here.
 **Cap: ≤ 90 words.**
 
 ## Who You Are Through This Lens
@@ -363,6 +374,19 @@ What this pattern reveals about how they think and work.
 ## Surprises
 What is unexpected or counterintuitive in this data.
 **Cap: ≤ 3 bullets, ≤ 25 words each.**
+
+## One Honest Observation
+One uncomfortable but important thing the data reveals.
+**Cap: ≤ 40 words.**
+
+---
+
+PART B — THROUGH THE LENS OF YOUR GOAL
+Part B interprets the observations through the user's stated goal. If the
+goal is generic or thin, Part B is allowed to be short. Do NOT pad with
+filler. Open Part B with the italic label below.
+
+*Part B — Through the lens of your goal*
 
 ## Blind Spots
 What they are NOT using AI for that someone with their goal should be.
@@ -376,16 +400,14 @@ Specific, actionable recommendations tied to their profession and goal.
 Where their usage is heading if they continue on this path.
 **Cap: ≤ 50 words.**
 
-## One Honest Observation
-One uncomfortable but important thing the data reveals.
-**Cap: ≤ 40 words.**
-
 Be direct, specific, intelligent. No generic advice. British English.
 
 Before finishing, reread your draft. If any section exceeds its cap or the
 total exceeds 600 words, trim it. Do NOT drop a section to stay under the cap —
-every section above must appear. Do NOT include the "Cap:" lines in your
-output; they are instructions to you, not part of the brief."""
+every section above must appear. Do NOT include the "Cap:" lines or the
+"PART A"/"PART B" instruction blocks in your output; they are instructions to
+you, not part of the brief. Emit only the italic labels, the `---` separator,
+and the section headers."""
 
 resp = ollama.chat(
     model='mistral',
@@ -568,6 +590,20 @@ body {{
   line-height: 1.75;
 }}
 .brief-wrap strong {{ color: #5C4033; }}
+.brief-wrap hr {{
+  border: 0;
+  border-top: 1px solid #DDD8D0;
+  margin: 40px 0 28px;
+}}
+.brief-wrap p > em:only-child {{
+  display: block;
+  color: #5C4033;
+  font-size: 0.82em;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-style: normal;
+  margin: 4px 0 12px;
+}}
 .footer {{
   text-align: center;
   padding: 40px 20px;
