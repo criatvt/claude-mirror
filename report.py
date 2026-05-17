@@ -63,8 +63,15 @@ if len(oot) > 0:
         print(f"      {label!r}: {count}")
 df['created_at'] = pd.to_datetime(df['created_at'], utc=True)
 df['month_dt'] = df['created_at'].dt.to_period('M').dt.to_timestamp()
-df['hour'] = df['created_at'].dt.hour
-df['dayofweek'] = df['created_at'].dt.day_name()
+# Hour-of-day and day-of-week reflect the user's wall clock, not UTC.
+# Filtering against cutoff_date continues to use the UTC `created_at` column.
+_local_now = datetime.now().astimezone()
+LOCAL_TZ = _local_now.tzinfo
+_offset = _local_now.strftime('%z')  # e.g. '+0530'
+TZ_LABEL = f"UTC{_offset[:3]}:{_offset[3:]}" if _offset else 'UTC'
+df['created_local'] = df['created_at'].dt.tz_convert(LOCAL_TZ)
+df['hour'] = df['created_local'].dt.hour
+df['dayofweek'] = df['created_local'].dt.day_name()
 df['layer1'] = pd.Categorical(df['layer1'], categories=LAYER1_ORDER, ordered=True)
 
 # ── Apply period filter ───────────────────────────────────────────────────────
@@ -162,8 +169,8 @@ hm = df.groupby(['dayofweek','hour']).size().unstack(fill_value=0)
 hm = hm.reindex(days_order, fill_value=0)
 sns.heatmap(hm, ax=ax, cmap=sns.light_palette(PRUSSIAN, as_cmap=True),
             linewidths=0.5, linecolor=BG, cbar_kws={'label': 'Conversations'})
-ax.set_title('When You Use Claude', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Hour of Day', fontsize=11); ax.set_ylabel('')
+ax.set_title(f'When You Use Claude ({TZ_LABEL})', fontsize=15, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel(f'Hour of Day ({TZ_LABEL})', fontsize=11); ax.set_ylabel('')
 plt.tight_layout()
 charts['heatmap'] = fig_to_b64(fig)
 print("  ✓ Chart 4: Heatmap")
@@ -622,7 +629,7 @@ body {{
   <div class="hero-badge">&#128274; Generated locally &nbsp;&middot;&nbsp; No data left your machine</div>
   <p class="hero-eyebrow">Claude Mirror &nbsp;&middot;&nbsp; AI Usage Report</p>
   <h1>{name}'s<br><span>AI Mirror</span></h1>
-  <p class="hero-meta">{config.get('period', config.get('period_label', 'All available data'))} &nbsp;&middot;&nbsp; {date_min} &rarr; {date_max} &nbsp;&middot;&nbsp; Generated {now_str}</p>
+  <p class="hero-meta">{config.get('period', config.get('period_label', 'All available data'))} &nbsp;&middot;&nbsp; {date_min} &rarr; {date_max} &nbsp;&middot;&nbsp; Generated {now_str} &nbsp;&middot;&nbsp; Times in {TZ_LABEL}</p>
   <div class="stats-row">
     <div class="stat-card"><span class="stat-number">{total}</span><span class="stat-label">Conversations</span></div>
     <div class="stat-card"><span class="stat-number">{days}</span><span class="stat-label">Days of Data</span></div>
