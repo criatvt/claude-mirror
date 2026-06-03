@@ -313,13 +313,18 @@ for cat in LAYER1_ORDER:
             themes_per_cat[cat] = top
 
     if has_summary:
-        # Prefer summaries from the longest conversations in each category
+        # Prefer summaries from the longest conversations in each category.
+        # Capture the conversation `name` too so the brief can cite real
+        # titles in italics (issue #20).
         ordered = sub.sort_values('message_count', ascending=False)
         picks = []
-        for s in ordered['summary'].dropna().tolist():
-            s = str(s).strip()
-            if s and s.lower() not in ('nan', 'none') and s not in picks:
-                picks.append(s)
+        seen_summaries = set()
+        for _, row in ordered.iterrows():
+            s = str(row['summary']).strip() if pd.notna(row['summary']) else ''
+            n = str(row['name']).strip() if pd.notna(row['name']) else ''
+            if s and s.lower() not in ('nan', 'none') and s not in seen_summaries:
+                picks.append({'name': n, 'summary': s})
+                seen_summaries.add(s)
             if len(picks) >= 4:
                 break
         if picks:
@@ -334,8 +339,11 @@ if samples_per_cat:
     sample_lines = []
     for cat, picks in samples_per_cat.items():
         sample_lines.append(f"- {cat}:")
-        for s in picks:
-            sample_lines.append(f"    • {s}")
+        for p in picks:
+            if p['name']:
+                sample_lines.append(f"    • [{p['name']}] {p['summary']}")
+            else:
+                sample_lines.append(f"    • {p['summary']}")
     samples_block = '\n'.join(sample_lines)
 else:
     samples_block = "(no per-conversation summaries — re-run classify.py to enable)"
@@ -548,6 +556,40 @@ brief_html = _hl_straggler.sub('', brief_html)
 brief_html = _re_hl.sub(r'<p>\s*</p>', '', brief_html)
 print("  ✓ Brief generated")
 
+# ── Conversations panel (issue #20 — scope: drop in-brief citations, ─────────
+#    surface real conversations as a deterministic report section instead)
+from html import escape as _h_escape
+
+cat_counts = df['layer1'].value_counts().to_dict()
+panel_groups_html = []
+panel_groups_md = []
+for cat in LAYER1_ORDER:
+    picks = [p for p in samples_per_cat.get(cat, []) if p.get('name')][:2]
+    if not picks:
+        continue
+    count = int(cat_counts.get(cat, 0))
+    entries_html = '\n'.join(
+        f'      <div class="convo-entry">\n'
+        f'        <p class="convo-title">{_h_escape(p["name"])}</p>\n'
+        f'        <p class="convo-summary">{_h_escape(p["summary"])}</p>\n'
+        f'      </div>'
+        for p in picks
+    )
+    panel_groups_html.append(
+        f'    <div class="convo-cat">\n'
+        f'      <p class="convo-cat-head"><span class="convo-cat-name">{cat}</span>'
+        f'&nbsp;&nbsp;&middot;&nbsp;&nbsp;{count} conversations</p>\n'
+        f'{entries_html}\n'
+        f'    </div>'
+    )
+    md_entries = '\n\n'.join(
+        f"**{p['name']}**  \n{p['summary']}" for p in picks
+    )
+    panel_groups_md.append(f"### {cat} · {count} conversations\n\n{md_entries}")
+convo_panel_html = '\n'.join(panel_groups_html)
+convo_panel_md = '\n\n'.join(panel_groups_md)
+print(f"  ✓ Conversations panel ({len(panel_groups_html)} categories)")
+
 # ── HTML ──────────────────────────────────────────────────────────────────────
 print("\n  Building report...")
 now_str = datetime.now().strftime('%B %d, %Y')
@@ -752,6 +794,39 @@ body {{
   padding: 12px 0 12px 28px;
   font-weight: 500;
 }}
+/* ─── Conversations panel ─── */
+.convo-panel {{ padding: 8px 4px; }}
+.convo-cat {{
+  padding: 28px 0;
+  border-top: 1px solid #E5DFD0;
+}}
+.convo-cat:first-child {{ border-top: none; padding-top: 0; }}
+.convo-cat:last-child {{ padding-bottom: 0; }}
+.convo-cat-head {{
+  font-size: 0.72em;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #6B5D4A;
+  margin-bottom: 22px;
+  font-weight: 500;
+}}
+.convo-cat-name {{ color: #B85A3D; }}
+.convo-entry {{ margin-bottom: 20px; }}
+.convo-entry:last-child {{ margin-bottom: 0; }}
+.convo-title {{
+  font-style: italic;
+  color: #1E1A14;
+  font-size: 1.18em;
+  line-height: 1.3;
+  margin: 0 0 6px;
+  font-weight: 500;
+}}
+.convo-summary {{
+  color: #6B5D4A;
+  font-size: 1.0em;
+  line-height: 1.55;
+  margin: 0;
+}}
 /* Drop cap on the first paragraph after the first h2 in the brief */
 .brief-wrap h2:first-of-type + p::first-letter {{
   font-size: 3.6em;
@@ -865,6 +940,17 @@ body {{
   <div class="divider"></div>
 
   <div class="section">
+    <p class="section-eyebrow">Specifics</p>
+    <h2 class="section-title">What You've Been Talking About</h2>
+    <p class="section-desc">Real conversations from the data &mdash; your deepest threads in each category.</p>
+    <div class="card convo-panel">
+{convo_panel_html}
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
     <p class="section-eyebrow">A reflection</p>
     <h2 class="section-title">The Mirror</h2>
     <p class="section-desc">A thoughtful read of your data — written locally by Mistral on your machine.</p>
@@ -930,6 +1016,14 @@ md = f"""# Claude Mirror Report
 | Category | Count | % |
 |----------|-------|---|
 {l1_table}
+
+---
+
+## What You've Been Talking About
+
+Real conversations from the data — your deepest threads in each category.
+
+{convo_panel_md}
 
 ---
 
