@@ -111,6 +111,8 @@ plt.rcParams.update({
     'axes.labelcolor'  : PRUSSIAN,
     'xtick.color'      : PRUSSIAN,
     'ytick.color'      : PRUSSIAN,
+    'xtick.labelsize'  : 12,
+    'ytick.labelsize'  : 12,
     'text.color'       : PRUSSIAN,
     'grid.alpha'       : 0.3,
     'grid.color'       : PRUSSIAN,
@@ -127,7 +129,7 @@ def fig_to_b64(fig):
 charts = {}
 
 # Chart 1 — Donut
-fig, ax = plt.subplots(figsize=(8, 8), facecolor=BG)
+fig, ax = plt.subplots(figsize=(13, 9), facecolor=BG)
 counts = df['layer1'].value_counts()
 donut_total = int(counts.sum())
 wedges, _texts, autotexts = ax.pie(
@@ -137,12 +139,12 @@ wedges, _texts, autotexts = ax.pie(
     wedgeprops={'width': 0.55, 'edgecolor': BG, 'linewidth': 3},
     pctdistance=0.78, startangle=90)
 for a in autotexts:
-    a.set_fontsize(10); a.set_fontweight('bold'); a.set_color(BG)
-ax.set_title('Overall Distribution', fontsize=15, fontweight='bold', color=PRUSSIAN, pad=16)
+    a.set_fontsize(12); a.set_fontweight('bold'); a.set_color(BG)
+ax.set_title('Overall Distribution', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=16)
 legend_labels = [f'{cat}  ·  {cnt}  ({cnt/donut_total*100:.1f}%)'
                  for cat, cnt in counts.items()]
 ax.legend(wedges, legend_labels, loc='upper center',
-          bbox_to_anchor=(0.5, -0.02), ncol=2, frameon=False, fontsize=10,
+          bbox_to_anchor=(0.5, -0.02), ncol=2, frameon=False, fontsize=12,
           handlelength=1.4, columnspacing=2.4, handletextpad=0.8)
 plt.tight_layout()
 charts['donut'] = fig_to_b64(fig)
@@ -157,10 +159,10 @@ bars = ax.bar(month_labels, monthly['count'], color=PRUSSIAN, alpha=0.85,
               width=bar_width, zorder=3)
 for bar in bars:
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
-            str(int(bar.get_height())), ha='center', va='bottom', fontsize=9, color=PRUSSIAN)
+            str(int(bar.get_height())), ha='center', va='bottom', fontsize=11, color=PRUSSIAN)
 ax.set_ylim(0, monthly['count'].max() * 1.10)
-ax.set_title('Conversations Per Month', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
+ax.set_title('Conversations Per Month', fontsize=18, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
 plt.xticks(rotation=45 if len(monthly) > 4 else 0, ha='right' if len(monthly) > 4 else 'center')
 plt.tight_layout()
@@ -180,9 +182,9 @@ for i, col in enumerate(pivot.columns):
            color=PALETTE[i], width=stack_width, alpha=0.9, zorder=3)
     bottom += vals
 ax.set_ylim(0, pivot.sum(axis=1).max() * 1.10)
-ax.set_title('Topic Mix Over Time', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
-ax.legend(loc='upper left', fontsize=9, framealpha=0.9)
+ax.set_title('Topic Mix Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
+ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
 plt.xticks(rotation=45 if len(pivot) > 4 else 0, ha='right' if len(pivot) > 4 else 'center')
 plt.tight_layout()
@@ -196,30 +198,30 @@ hm = df.groupby(['dayofweek','hour']).size().unstack(fill_value=0)
 hm = hm.reindex(days_order, fill_value=0)
 sns.heatmap(hm, ax=ax, cmap=sns.light_palette(PRUSSIAN, as_cmap=True),
             linewidths=0.5, linecolor=BG, cbar_kws={'label': 'Conversations'})
-ax.set_title(f'When You Use Claude ({TZ_LABEL})', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel(f'Hour of Day ({TZ_LABEL})', fontsize=11); ax.set_ylabel('')
+ax.set_title(f'When You Use Claude ({TZ_LABEL})', fontsize=18, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel(f'Hour of Day ({TZ_LABEL})', fontsize=14); ax.set_ylabel('')
 plt.tight_layout()
 charts['heatmap'] = fig_to_b64(fig)
 print("  ✓ Chart 4: Heatmap")
 
 # Chart 5 — Depth
-fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+fig, ax = plt.subplots(figsize=(16, 6.5), facecolor=BG)
 ax.hist(df['message_count'], bins=30, color=PRUSSIAN, alpha=0.8, edgecolor=BG, zorder=3)
 ax.axvline(df['message_count'].mean(), color=UMBER, linestyle='--', linewidth=2,
            label=f"Mean: {df['message_count'].mean():.1f}")
 ax.axvline(df['message_count'].median(), color=VERDIGRIS, linestyle='--', linewidth=2,
            label=f"Median: {df['message_count'].median():.1f}")
 ax.set_xlim(0, df['message_count'].max() * 1.05)
-ax.set_title('Conversation Depth', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Messages per Conversation', fontsize=11); ax.set_ylabel('Frequency', fontsize=11)
-ax.legend(fontsize=10)
+ax.set_title('Conversation Depth', fontsize=18, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel('Messages per Conversation', fontsize=14); ax.set_ylabel('Frequency', fontsize=14)
+ax.legend(fontsize=12)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
 plt.tight_layout()
 charts['depth'] = fig_to_b64(fig)
 print("  ✓ Chart 5: Depth")
 
 # Chart 6 — Layer 2
-fig, axes = plt.subplots(2, 4, figsize=(18, 9), facecolor=BG)
+fig, axes = plt.subplots(2, 4, figsize=(18, 11), facecolor=BG)
 axes = axes.flatten()
 for i, cat in enumerate(LAYER1_ORDER):
     ax = axes[i]
@@ -228,12 +230,12 @@ for i, cat in enumerate(LAYER1_ORDER):
         ax.set_visible(False); continue
     bars = ax.barh(sub.index, sub.values, color=PALETTE[i], alpha=0.85)
     ax.set_xlim(0, sub.values.max() * 1.15)
-    ax.set_title(cat, fontsize=12, fontweight='bold', color=PALETTE[i])
-    ax.set_xlabel('Count', fontsize=9)
+    ax.set_title(cat, fontsize=15, fontweight='bold', color=PALETTE[i])
+    ax.set_xlabel('Count', fontsize=11)
     ax.xaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
     for bar, val in zip(bars, sub.values):
-        ax.text(val + 0.1, bar.get_y() + bar.get_height()/2, str(val), va='center', fontsize=8)
-fig.suptitle('What You Do Within Each Category', fontsize=15, fontweight='bold', color=PRUSSIAN, y=1.01)
+        ax.text(val + 0.1, bar.get_y() + bar.get_height()/2, str(val), va='center', fontsize=10)
+fig.suptitle('What You Do Within Each Category', fontsize=18, fontweight='bold', color=PRUSSIAN, y=1.01)
 plt.tight_layout()
 charts['layer2'] = fig_to_b64(fig)
 print("  ✓ Chart 6: Layer 2")
@@ -249,25 +251,25 @@ for i, cat in enumerate(LAYER1_ORDER):
             linewidth=2.5, label=cat, color=PALETTE[i], alpha=0.9)
 if trends_ymax > 0:
     ax.set_ylim(0, trends_ymax * 1.10)
-ax.set_title('Category Trends Over Time', fontsize=15, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
-ax.legend(loc='upper left', fontsize=9, framealpha=0.9)
+ax.set_title('Category Trends Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
+ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
+ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
 plt.xticks(rotation=45, ha='right'); plt.tight_layout()
 charts['trends'] = fig_to_b64(fig)
 print("  ✓ Chart 7: Trends")
 
 # Chart 8 — Word cloud
-fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
+fig, ax = plt.subplots(figsize=(16, 7), facecolor=BG)
 titles_text = ' '.join(df['name'].dropna().tolist())
 stopwords = {'and','the','for','with','how','to','a','an','in','of','on',
              'is','my','me','i','it','using','use','help','can','from',
              'this','that','about','at','be'}
-wc = WordCloud(width=1400, height=600, background_color=BG, colormap='copper',
+wc = WordCloud(width=1600, height=700, background_color=BG, colormap='copper',
                stopwords=stopwords, max_words=100,
                prefer_horizontal=0.85).generate(titles_text)
 ax.imshow(wc, interpolation='bilinear'); ax.axis('off')
-ax.set_title('What You Talk About', fontsize=15, fontweight='bold', color=PRUSSIAN, pad=15)
+ax.set_title('What You Talk About', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=15)
 plt.tight_layout()
 charts['wordcloud'] = fig_to_b64(fig)
 print("  ✓ Chart 8: Word cloud")
@@ -680,11 +682,6 @@ body {{
   padding-top: 16px;
   border-top: 1px solid #EFE6CE;
 }}
-.grid-2 {{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}}
 .divider {{
   height: 1px;
   background: #E5DFD0;
@@ -779,7 +776,6 @@ body {{
   .container {{ padding: 48px 24px; }}
   .hero h1 {{ font-size: 2.6em; }}
   .section-title {{ font-size: 1.9em; }}
-  .grid-2 {{ grid-template-columns: 1fr; }}
   .brief-wrap {{ padding: 28px; }}
   .stats-row {{ gap: 28px; }}
 }}
@@ -824,15 +820,13 @@ body {{
     <p class="section-eyebrow">What You Use Claude For</p>
     <h2 class="section-title">Your Usage Breakdown</h2>
     <p class="section-desc">Where you spend your AI time &mdash; and how deep you go.</p>
-    <div class="grid-2">
-      <div class="card">
-        <img src="data:image/png;base64,{charts['donut']}" alt="Distribution">
-        <p class="card-note">Overall category distribution.</p>
-      </div>
-      <div class="card">
-        <img src="data:image/png;base64,{charts['depth']}" alt="Depth">
-        <p class="card-note">Short tasks vs deep working sessions.</p>
-      </div>
+    <div class="card">
+      <img src="data:image/png;base64,{charts['donut']}" alt="Distribution">
+      <p class="card-note">Overall category distribution.</p>
+    </div>
+    <div class="card">
+      <img src="data:image/png;base64,{charts['depth']}" alt="Depth">
+      <p class="card-note">Short tasks vs deep working sessions.</p>
     </div>
   </div>
 
