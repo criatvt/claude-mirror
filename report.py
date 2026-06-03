@@ -158,6 +158,7 @@ bars = ax.bar(month_labels, monthly['count'], color=PRUSSIAN, alpha=0.85,
 for bar in bars:
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
             str(int(bar.get_height())), ha='center', va='bottom', fontsize=9, color=PRUSSIAN)
+ax.set_ylim(0, monthly['count'].max() * 1.10)
 ax.set_title('Conversations Per Month', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
 ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
@@ -178,6 +179,7 @@ for i, col in enumerate(pivot.columns):
     ax.bar(stack_labels, vals, bottom=bottom, label=col,
            color=PALETTE[i], width=stack_width, alpha=0.9, zorder=3)
     bottom += vals
+ax.set_ylim(0, pivot.sum(axis=1).max() * 1.10)
 ax.set_title('Topic Mix Over Time', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
 ax.legend(loc='upper left', fontsize=9, framealpha=0.9)
@@ -207,6 +209,7 @@ ax.axvline(df['message_count'].mean(), color=UMBER, linestyle='--', linewidth=2,
            label=f"Mean: {df['message_count'].mean():.1f}")
 ax.axvline(df['message_count'].median(), color=VERDIGRIS, linestyle='--', linewidth=2,
            label=f"Median: {df['message_count'].median():.1f}")
+ax.set_xlim(0, df['message_count'].max() * 1.05)
 ax.set_title('Conversation Depth', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Messages per Conversation', fontsize=11); ax.set_ylabel('Frequency', fontsize=11)
 ax.legend(fontsize=10)
@@ -224,6 +227,7 @@ for i, cat in enumerate(LAYER1_ORDER):
     if len(sub) == 0:
         ax.set_visible(False); continue
     bars = ax.barh(sub.index, sub.values, color=PALETTE[i], alpha=0.85)
+    ax.set_xlim(0, sub.values.max() * 1.15)
     ax.set_title(cat, fontsize=12, fontweight='bold', color=PALETTE[i])
     ax.set_xlabel('Count', fontsize=9)
     ax.xaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
@@ -236,11 +240,15 @@ print("  ✓ Chart 6: Layer 2")
 
 # Chart 7 — Trends
 fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
+trends_ymax = 0
 for i, cat in enumerate(LAYER1_ORDER):
     cm = df[df['layer1'] == cat].groupby('month_dt').size().reset_index(name='count')
     if len(cm) < 2: continue
+    trends_ymax = max(trends_ymax, int(cm['count'].max()))
     ax.plot(cm['month_dt'], cm['count'], marker='o', markersize=5,
             linewidth=2.5, label=cat, color=PALETTE[i], alpha=0.9)
+if trends_ymax > 0:
+    ax.set_ylim(0, trends_ymax * 1.10)
 ax.set_title('Category Trends Over Time', fontsize=15, fontweight='bold', color=PRUSSIAN)
 ax.set_xlabel('Month', fontsize=11); ax.set_ylabel('Conversations', fontsize=11)
 ax.legend(loc='upper left', fontsize=9, framealpha=0.9)
