@@ -24,10 +24,15 @@ Full context in README.md.
 
 ## Architecture
 ```
-onboarding.py   → config.json
-classify.py     → reads config + data/, writes classified.csv
-report.py       → reads config + classified.csv, writes output/report.html + output/report.md
+claude_mirror.py → canonical entrypoint: prereq checks + export auto-detection,
+                   then runs the three stages below in order (each exposes main())
+onboarding.py    → config.json
+classify.py      → reads config + data/, writes classified.csv
+report.py        → reads config + classified.csv, writes output/report.html + output/report.md
 ```
+
+`python3 claude_mirror.py` is the one-command path for users. The three stage
+scripts still run standalone (`python3 classify.py`, etc.) for debugging.
 
 ---
 
