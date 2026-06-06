@@ -73,5 +73,9 @@ def run():
     print("\nNext step:")
     print("  python3 classify.py\n")
 
+# `main` is the canonical entry point the orchestrator (#27) calls; `run` is
+# kept as a backward-compatible alias.
+main = run
+
 if __name__ == "__main__":
-    run()
+    main()

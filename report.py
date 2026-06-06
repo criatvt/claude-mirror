@@ -19,36 +19,38 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE, 'config.json')
 CLASSIFIED_PATH = os.path.join(BASE, 'classified.csv')
 OUTPUT_PATH = os.path.join(BASE, 'output')
-os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-if not os.path.exists(CONFIG_PATH):
-    print("\n  Run python3 onboarding.py first.\n")
-    exit(1)
+def main():
+    os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-with open(CONFIG_PATH) as f:
-    config = json.load(f)
+    if not os.path.exists(CONFIG_PATH):
+        print("\n  Run python3 onboarding.py first.\n")
+        exit(1)
 
-name = config['name']
-print(f"\n  Claude Mirror\n  Generating report for {name}...\n")
+    with open(CONFIG_PATH) as f:
+        config = json.load(f)
+
+    name = config['name']
+    print(f"\n  Claude Mirror\n  Generating report for {name}...\n")
 
 # ── Design System ─────────────────────────────────────────────────────────────
 # Editorial / New Yorker register — typography-led, light mode, serif body.
 # Watercolour-muted earthtones throughout. Terracotta carries the visual
 # hierarchy. Body text uses warm-black; charts use deep walnut (never pure
 # black) so the eye reads ink-on-paper, not data-on-screen.
-BG        = '#FBFAF6'   # warm white — fresh-paper cream
-WHITE     = '#FFFFFF'
-INK       = '#1E1A14'   # warm-black body text
-CHART_DEEP = '#3D2E20'  # deep walnut — chart anchor, never pure black
-MUTED     = '#6B5D4A'   # captions, eyebrows, footer
-HAIRLINE  = '#E5DFD0'   # card borders, dividers
-TERRACOTTA = '#B85A3D'  # accent — hero rule, italic wordmark, stat numbers
+    BG        = '#FBFAF6'   # warm white — fresh-paper cream
+    WHITE     = '#FFFFFF'
+    INK       = '#1E1A14'   # warm-black body text
+    CHART_DEEP = '#3D2E20'  # deep walnut — chart anchor, never pure black
+    MUTED     = '#6B5D4A'   # captions, eyebrows, footer
+    HAIRLINE  = '#E5DFD0'   # card borders, dividers
+    TERRACOTTA = '#B85A3D'  # accent — hero rule, italic wordmark, stat numbers
 # Legacy aliases kept for matplotlib rcParams below
-PRUSSIAN  = INK
-UMBER     = MUTED
-VERDIGRIS = TERRACOTTA
+    PRUSSIAN  = INK
+    UMBER     = MUTED
+    VERDIGRIS = TERRACOTTA
 
-PALETTE = [
+    PALETTE = [
     '#3D2E20',   # deep walnut
     '#B85A3D',   # terracotta
     '#708C6B',   # sage
@@ -59,51 +61,51 @@ PALETTE = [
     '#4F5E3F',   # moss
 ]
 
-LAYER1_ORDER = ['Writing', 'Strategy', 'Learning', 'Creative',
+    LAYER1_ORDER = ['Writing', 'Strategy', 'Learning', 'Creative',
                 'Research', 'Coding', 'Personal', 'Admin']
 
 # ── Load & clean ──────────────────────────────────────────────────────────────
-df = pd.read_csv(CLASSIFIED_PATH)
+    df = pd.read_csv(CLASSIFIED_PATH)
 # Surface stragglers from old CSVs (pre-schema runs may have out-of-taxonomy
 # values). With the schema in classify.py these should be zero on fresh runs.
-oot = df[~df['layer1'].isin(LAYER1_ORDER)]['layer1'].value_counts()
-if len(oot) > 0:
-    print(f"  ⚠ {oot.sum()} rows have out-of-taxonomy layer1 — re-run classify.py:")
-    for label, count in oot.items():
-        print(f"      {label!r}: {count}")
-df['created_at'] = pd.to_datetime(df['created_at'], utc=True)
-df['month_dt'] = df['created_at'].dt.to_period('M').dt.to_timestamp()
+    oot = df[~df['layer1'].isin(LAYER1_ORDER)]['layer1'].value_counts()
+    if len(oot) > 0:
+        print(f"  ⚠ {oot.sum()} rows have out-of-taxonomy layer1 — re-run classify.py:")
+        for label, count in oot.items():
+            print(f"      {label!r}: {count}")
+    df['created_at'] = pd.to_datetime(df['created_at'], utc=True)
+    df['month_dt'] = df['created_at'].dt.to_period('M').dt.to_timestamp()
 # Hour-of-day and day-of-week reflect the user's wall clock, not UTC.
 # Filtering against cutoff_date continues to use the UTC `created_at` column.
-_local_now = datetime.now().astimezone()
-LOCAL_TZ = _local_now.tzinfo
-_offset = _local_now.strftime('%z')  # e.g. '+0530'
-TZ_LABEL = f"UTC{_offset[:3]}:{_offset[3:]}" if _offset else 'UTC'
-df['created_local'] = df['created_at'].dt.tz_convert(LOCAL_TZ)
-df['hour'] = df['created_local'].dt.hour
-df['dayofweek'] = df['created_local'].dt.day_name()
-df['layer1'] = pd.Categorical(df['layer1'], categories=LAYER1_ORDER, ordered=True)
+    _local_now = datetime.now().astimezone()
+    LOCAL_TZ = _local_now.tzinfo
+    _offset = _local_now.strftime('%z')  # e.g. '+0530'
+    TZ_LABEL = f"UTC{_offset[:3]}:{_offset[3:]}" if _offset else 'UTC'
+    df['created_local'] = df['created_at'].dt.tz_convert(LOCAL_TZ)
+    df['hour'] = df['created_local'].dt.hour
+    df['dayofweek'] = df['created_local'].dt.day_name()
+    df['layer1'] = pd.Categorical(df['layer1'], categories=LAYER1_ORDER, ordered=True)
 
 # ── Apply period filter ───────────────────────────────────────────────────────
-cutoff = config.get('cutoff_date') or config.get('start_date')
-if cutoff:
-    cutoff_ts = pd.Timestamp(cutoff, tz='UTC')
-    df = df[df['created_at'] >= cutoff_ts]
-    print(f"  Filtered to {len(df)} conversations from {cutoff[:10]} onwards.")
+    cutoff = config.get('cutoff_date') or config.get('start_date')
+    if cutoff:
+        cutoff_ts = pd.Timestamp(cutoff, tz='UTC')
+        df = df[df['created_at'] >= cutoff_ts]
+        print(f"  Filtered to {len(df)} conversations from {cutoff[:10]} onwards.")
 
-total       = len(df)
-date_min    = df['created_at'].min().date()
-date_max    = df['created_at'].max().date()
-days        = (df['created_at'].max() - df['created_at'].min()).days
-avg_msg     = df['message_count'].mean()
-max_msg     = int(df['message_count'].max())
-peak_month  = df.groupby('month_dt').size().idxmax().strftime('%b %Y')
-peak_count  = int(df.groupby('month_dt').size().max())
-common_day  = df['dayofweek'].value_counts().idxmax()
-common_hour = int(df['hour'].value_counts().idxmax())
-top_cat     = str(df['layer1'].value_counts().idxmax())
+    total       = len(df)
+    date_min    = df['created_at'].min().date()
+    date_max    = df['created_at'].max().date()
+    days        = (df['created_at'].max() - df['created_at'].min()).days
+    avg_msg     = df['message_count'].mean()
+    max_msg     = int(df['message_count'].max())
+    peak_month  = df.groupby('month_dt').size().idxmax().strftime('%b %Y')
+    peak_count  = int(df.groupby('month_dt').size().max())
+    common_day  = df['dayofweek'].value_counts().idxmax()
+    common_hour = int(df['hour'].value_counts().idxmax())
+    top_cat     = str(df['layer1'].value_counts().idxmax())
 
-plt.rcParams.update({
+    plt.rcParams.update({
     'font.family'      : 'DejaVu Serif',
     'figure.facecolor' : BG,
     'axes.facecolor'   : BG,
@@ -118,237 +120,237 @@ plt.rcParams.update({
     'grid.color'       : PRUSSIAN,
 })
 
-def fig_to_b64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor=BG)
-    buf.seek(0)
-    b64 = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close(fig)
-    return b64
+    def fig_to_b64(fig):
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor=BG)
+        buf.seek(0)
+        b64 = base64.b64encode(buf.read()).decode('utf-8')
+        plt.close(fig)
+        return b64
 
-charts = {}
+    charts = {}
 
 # Chart 1 — Donut
-fig, ax = plt.subplots(figsize=(13, 9), facecolor=BG)
-counts = df['layer1'].value_counts()
-donut_total = int(counts.sum())
-wedges, _texts, autotexts = ax.pie(
+    fig, ax = plt.subplots(figsize=(13, 9), facecolor=BG)
+    counts = df['layer1'].value_counts()
+    donut_total = int(counts.sum())
+    wedges, _texts, autotexts = ax.pie(
     counts.values,
     autopct=lambda p: f'{p:.0f}%' if p >= 6 else '',
     colors=PALETTE[:len(counts)],
     wedgeprops={'width': 0.55, 'edgecolor': BG, 'linewidth': 3},
     pctdistance=0.78, startangle=90)
-for a in autotexts:
-    a.set_fontsize(12); a.set_fontweight('bold'); a.set_color(BG)
-ax.set_title('Overall Distribution', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=16)
-legend_labels = [f'{cat}  ·  {cnt}  ({cnt/donut_total*100:.1f}%)'
+    for a in autotexts:
+        a.set_fontsize(12); a.set_fontweight('bold'); a.set_color(BG)
+    ax.set_title('Overall Distribution', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=16)
+    legend_labels = [f'{cat}  ·  {cnt}  ({cnt/donut_total*100:.1f}%)'
                  for cat, cnt in counts.items()]
-ax.legend(wedges, legend_labels, loc='upper center',
+    ax.legend(wedges, legend_labels, loc='upper center',
           bbox_to_anchor=(0.5, -0.02), ncol=2, frameon=False, fontsize=12,
           handlelength=1.4, columnspacing=2.4, handletextpad=0.8)
-plt.tight_layout()
-charts['donut'] = fig_to_b64(fig)
-print("  ✓ Chart 1: Donut")
+    plt.tight_layout()
+    charts['donut'] = fig_to_b64(fig)
+    print("  ✓ Chart 1: Donut")
 
 # Chart 2 — Monthly volume (categorical x-axis so bars don't overflow on short ranges)
-fig, ax = plt.subplots(figsize=(14, 5), facecolor=BG)
-monthly = df.groupby('month_dt').size().reset_index(name='count')
-month_labels = [d.strftime('%b %Y') for d in monthly['month_dt']]
-bar_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(monthly)) / 12))
-bars = ax.bar(month_labels, monthly['count'], color=PRUSSIAN, alpha=0.85,
+    fig, ax = plt.subplots(figsize=(14, 5), facecolor=BG)
+    monthly = df.groupby('month_dt').size().reset_index(name='count')
+    month_labels = [d.strftime('%b %Y') for d in monthly['month_dt']]
+    bar_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(monthly)) / 12))
+    bars = ax.bar(month_labels, monthly['count'], color=PRUSSIAN, alpha=0.85,
               width=bar_width, zorder=3)
-for bar in bars:
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+    for bar in bars:
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
             str(int(bar.get_height())), ha='center', va='bottom', fontsize=11, color=PRUSSIAN)
-ax.set_ylim(0, monthly['count'].max() * 1.10)
-ax.set_title('Conversations Per Month', fontsize=18, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
-ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
-plt.xticks(rotation=45 if len(monthly) > 4 else 0, ha='right' if len(monthly) > 4 else 'center')
-plt.tight_layout()
-charts['monthly'] = fig_to_b64(fig)
-print("  ✓ Chart 2: Monthly volume")
+    ax.set_ylim(0, monthly['count'].max() * 1.10)
+    ax.set_title('Conversations Per Month', fontsize=18, fontweight='bold', color=PRUSSIAN)
+    ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
+    plt.xticks(rotation=45 if len(monthly) > 4 else 0, ha='right' if len(monthly) > 4 else 'center')
+    plt.tight_layout()
+    charts['monthly'] = fig_to_b64(fig)
+    print("  ✓ Chart 2: Monthly volume")
 
 # Chart 3 — Stacked monthly (categorical x-axis matches Chart 2)
-fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
-pivot = df.groupby(['month_dt', 'layer1']).size().unstack(fill_value=0)
-pivot = pivot.reindex(columns=LAYER1_ORDER, fill_value=0)
-stack_labels = [d.strftime('%b %Y') for d in pivot.index]
-stack_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(pivot)) / 12))
-bottom = np.zeros(len(pivot))
-for i, col in enumerate(pivot.columns):
-    vals = pivot[col].values
-    ax.bar(stack_labels, vals, bottom=bottom, label=col,
+    fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
+    pivot = df.groupby(['month_dt', 'layer1']).size().unstack(fill_value=0)
+    pivot = pivot.reindex(columns=LAYER1_ORDER, fill_value=0)
+    stack_labels = [d.strftime('%b %Y') for d in pivot.index]
+    stack_width = min(0.6, 0.18 + 0.42 * max(0, (12 - len(pivot)) / 12))
+    bottom = np.zeros(len(pivot))
+    for i, col in enumerate(pivot.columns):
+        vals = pivot[col].values
+        ax.bar(stack_labels, vals, bottom=bottom, label=col,
            color=PALETTE[i], width=stack_width, alpha=0.9, zorder=3)
-    bottom += vals
-ax.set_ylim(0, pivot.sum(axis=1).max() * 1.10)
-ax.set_title('Topic Mix Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
-ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
-ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
-plt.xticks(rotation=45 if len(pivot) > 4 else 0, ha='right' if len(pivot) > 4 else 'center')
-plt.tight_layout()
-charts['stacked'] = fig_to_b64(fig)
-print("  ✓ Chart 3: Stacked monthly")
+        bottom += vals
+    ax.set_ylim(0, pivot.sum(axis=1).max() * 1.10)
+    ax.set_title('Topic Mix Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
+    ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
+    ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
+    plt.xticks(rotation=45 if len(pivot) > 4 else 0, ha='right' if len(pivot) > 4 else 'center')
+    plt.tight_layout()
+    charts['stacked'] = fig_to_b64(fig)
+    print("  ✓ Chart 3: Stacked monthly")
 
 # Chart 4 — Heatmap
-fig, ax = plt.subplots(figsize=(14, 5), facecolor=BG)
-days_order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
-hm = df.groupby(['dayofweek','hour']).size().unstack(fill_value=0)
-hm = hm.reindex(days_order, fill_value=0)
-sns.heatmap(hm, ax=ax, cmap=sns.light_palette(PRUSSIAN, as_cmap=True),
+    fig, ax = plt.subplots(figsize=(14, 5), facecolor=BG)
+    days_order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+    hm = df.groupby(['dayofweek','hour']).size().unstack(fill_value=0)
+    hm = hm.reindex(days_order, fill_value=0)
+    sns.heatmap(hm, ax=ax, cmap=sns.light_palette(PRUSSIAN, as_cmap=True),
             linewidths=0.5, linecolor=BG, cbar_kws={'label': 'Conversations'})
-ax.set_title(f'When You Use Claude ({TZ_LABEL})', fontsize=18, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel(f'Hour of Day ({TZ_LABEL})', fontsize=14); ax.set_ylabel('')
-plt.tight_layout()
-charts['heatmap'] = fig_to_b64(fig)
-print("  ✓ Chart 4: Heatmap")
+    ax.set_title(f'When You Use Claude ({TZ_LABEL})', fontsize=18, fontweight='bold', color=PRUSSIAN)
+    ax.set_xlabel(f'Hour of Day ({TZ_LABEL})', fontsize=14); ax.set_ylabel('')
+    plt.tight_layout()
+    charts['heatmap'] = fig_to_b64(fig)
+    print("  ✓ Chart 4: Heatmap")
 
 # Chart 5 — Depth
-fig, ax = plt.subplots(figsize=(16, 6.5), facecolor=BG)
-ax.hist(df['message_count'], bins=30, color=PRUSSIAN, alpha=0.8, edgecolor=BG, zorder=3)
-ax.axvline(df['message_count'].mean(), color=UMBER, linestyle='--', linewidth=2,
+    fig, ax = plt.subplots(figsize=(16, 6.5), facecolor=BG)
+    ax.hist(df['message_count'], bins=30, color=PRUSSIAN, alpha=0.8, edgecolor=BG, zorder=3)
+    ax.axvline(df['message_count'].mean(), color=UMBER, linestyle='--', linewidth=2,
            label=f"Mean: {df['message_count'].mean():.1f}")
-ax.axvline(df['message_count'].median(), color=VERDIGRIS, linestyle='--', linewidth=2,
+    ax.axvline(df['message_count'].median(), color=VERDIGRIS, linestyle='--', linewidth=2,
            label=f"Median: {df['message_count'].median():.1f}")
-ax.set_xlim(0, df['message_count'].max() * 1.05)
-ax.set_title('Conversation Depth', fontsize=18, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Messages per Conversation', fontsize=14); ax.set_ylabel('Frequency', fontsize=14)
-ax.legend(fontsize=12)
-ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
-plt.tight_layout()
-charts['depth'] = fig_to_b64(fig)
-print("  ✓ Chart 5: Depth")
+    ax.set_xlim(0, df['message_count'].max() * 1.05)
+    ax.set_title('Conversation Depth', fontsize=18, fontweight='bold', color=PRUSSIAN)
+    ax.set_xlabel('Messages per Conversation', fontsize=14); ax.set_ylabel('Frequency', fontsize=14)
+    ax.legend(fontsize=12)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0); ax.set_axisbelow(True)
+    plt.tight_layout()
+    charts['depth'] = fig_to_b64(fig)
+    print("  ✓ Chart 5: Depth")
 
 # Chart 6 — Layer 2
-fig, axes = plt.subplots(2, 4, figsize=(18, 11), facecolor=BG)
-axes = axes.flatten()
-for i, cat in enumerate(LAYER1_ORDER):
-    ax = axes[i]
-    sub = df[df['layer1'] == cat]['layer2'].value_counts().head(5)
-    if len(sub) == 0:
-        ax.set_visible(False); continue
-    bars = ax.barh(sub.index, sub.values, color=PALETTE[i], alpha=0.85)
-    ax.set_xlim(0, sub.values.max() * 1.15)
-    ax.set_title(cat, fontsize=15, fontweight='bold', color=PALETTE[i])
-    ax.set_xlabel('Count', fontsize=11)
-    ax.xaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
-    for bar, val in zip(bars, sub.values):
-        ax.text(val + 0.1, bar.get_y() + bar.get_height()/2, str(val), va='center', fontsize=10)
-fig.suptitle('What You Do Within Each Category', fontsize=18, fontweight='bold', color=PRUSSIAN, y=1.01)
-plt.tight_layout()
-charts['layer2'] = fig_to_b64(fig)
-print("  ✓ Chart 6: Layer 2")
+    fig, axes = plt.subplots(2, 4, figsize=(18, 11), facecolor=BG)
+    axes = axes.flatten()
+    for i, cat in enumerate(LAYER1_ORDER):
+        ax = axes[i]
+        sub = df[df['layer1'] == cat]['layer2'].value_counts().head(5)
+        if len(sub) == 0:
+            ax.set_visible(False); continue
+        bars = ax.barh(sub.index, sub.values, color=PALETTE[i], alpha=0.85)
+        ax.set_xlim(0, sub.values.max() * 1.15)
+        ax.set_title(cat, fontsize=15, fontweight='bold', color=PALETTE[i])
+        ax.set_xlabel('Count', fontsize=11)
+        ax.xaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
+        for bar, val in zip(bars, sub.values):
+            ax.text(val + 0.1, bar.get_y() + bar.get_height()/2, str(val), va='center', fontsize=10)
+    fig.suptitle('What You Do Within Each Category', fontsize=18, fontweight='bold', color=PRUSSIAN, y=1.01)
+    plt.tight_layout()
+    charts['layer2'] = fig_to_b64(fig)
+    print("  ✓ Chart 6: Layer 2")
 
 # Chart 7 — Trends
-fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
-trends_ymax = 0
-for i, cat in enumerate(LAYER1_ORDER):
-    cm = df[df['layer1'] == cat].groupby('month_dt').size().reset_index(name='count')
-    if len(cm) < 2: continue
-    trends_ymax = max(trends_ymax, int(cm['count'].max()))
-    ax.plot(cm['month_dt'], cm['count'], marker='o', markersize=5,
+    fig, ax = plt.subplots(figsize=(14, 6), facecolor=BG)
+    trends_ymax = 0
+    for i, cat in enumerate(LAYER1_ORDER):
+        cm = df[df['layer1'] == cat].groupby('month_dt').size().reset_index(name='count')
+        if len(cm) < 2: continue
+        trends_ymax = max(trends_ymax, int(cm['count'].max()))
+        ax.plot(cm['month_dt'], cm['count'], marker='o', markersize=5,
             linewidth=2.5, label=cat, color=PALETTE[i], alpha=0.9)
-if trends_ymax > 0:
-    ax.set_ylim(0, trends_ymax * 1.10)
-ax.set_title('Category Trends Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
-ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
-ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
-ax.yaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
-plt.xticks(rotation=45, ha='right'); plt.tight_layout()
-charts['trends'] = fig_to_b64(fig)
-print("  ✓ Chart 7: Trends")
+    if trends_ymax > 0:
+        ax.set_ylim(0, trends_ymax * 1.10)
+    ax.set_title('Category Trends Over Time', fontsize=18, fontweight='bold', color=PRUSSIAN)
+    ax.set_xlabel('Month', fontsize=14); ax.set_ylabel('Conversations', fontsize=14)
+    ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4); ax.set_axisbelow(True)
+    plt.xticks(rotation=45, ha='right'); plt.tight_layout()
+    charts['trends'] = fig_to_b64(fig)
+    print("  ✓ Chart 7: Trends")
 
 # Chart 8 — Word cloud
-fig, ax = plt.subplots(figsize=(16, 7), facecolor=BG)
-titles_text = ' '.join(df['name'].dropna().tolist())
-stopwords = {'and','the','for','with','how','to','a','an','in','of','on',
+    fig, ax = plt.subplots(figsize=(16, 7), facecolor=BG)
+    titles_text = ' '.join(df['name'].dropna().tolist())
+    stopwords = {'and','the','for','with','how','to','a','an','in','of','on',
              'is','my','me','i','it','using','use','help','can','from',
              'this','that','about','at','be'}
-wc = WordCloud(width=1600, height=700, background_color=BG, colormap='copper',
+    wc = WordCloud(width=1600, height=700, background_color=BG, colormap='copper',
                stopwords=stopwords, max_words=100,
                prefer_horizontal=0.85).generate(titles_text)
-ax.imshow(wc, interpolation='bilinear'); ax.axis('off')
-ax.set_title('What You Talk About', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=15)
-plt.tight_layout()
-charts['wordcloud'] = fig_to_b64(fig)
-print("  ✓ Chart 8: Word cloud")
+    ax.imshow(wc, interpolation='bilinear'); ax.axis('off')
+    ax.set_title('What You Talk About', fontsize=18, fontweight='bold', color=PRUSSIAN, pad=15)
+    plt.tight_layout()
+    charts['wordcloud'] = fig_to_b64(fig)
+    print("  ✓ Chart 8: Word cloud")
 
 # ── Brief ─────────────────────────────────────────────────────────────────────
-print("\n  Generating your personal brief (3-5 mins)...")
+    print("\n  Generating your personal brief (3-5 mins)...")
 
-l1_dist = df['layer1'].value_counts().to_dict()
-l2 = {cat: df[df['layer1'] == cat]['layer2'].value_counts().head(5).to_dict()
+    l1_dist = df['layer1'].value_counts().to_dict()
+    l2 = {cat: df[df['layer1'] == cat]['layer2'].value_counts().head(5).to_dict()
       for cat in LAYER1_ORDER}
-monthly_str = {str(k.date()): int(v) for k, v in df.groupby('month_dt').size().items()}
-longest = df.nlargest(3, 'message_count')[['name','message_count','layer1']].to_dict('records')
+    monthly_str = {str(k.date()): int(v) for k, v in df.groupby('month_dt').size().items()}
+    longest = df.nlargest(3, 'message_count')[['name','message_count','layer1']].to_dict('records')
 
 # ── Per-category themes & sample summaries (issue #9) ─────────────────────────
-from collections import Counter
+    from collections import Counter
 
-has_summary = 'summary' in df.columns
-has_themes = 'key_themes' in df.columns
+    has_summary = 'summary' in df.columns
+    has_themes = 'key_themes' in df.columns
 
-if not (has_summary and has_themes):
-    print("  ⚠ classified.csv is missing 'summary'/'key_themes' columns — "
+    if not (has_summary and has_themes):
+        print("  ⚠ classified.csv is missing 'summary'/'key_themes' columns — "
           "re-run classify.py to enrich the brief with specific themes.")
 
-themes_per_cat = {}
-samples_per_cat = {}
+    themes_per_cat = {}
+    samples_per_cat = {}
 
-for cat in LAYER1_ORDER:
-    sub = df[df['layer1'] == cat]
-    if len(sub) == 0:
-        continue
+    for cat in LAYER1_ORDER:
+        sub = df[df['layer1'] == cat]
+        if len(sub) == 0:
+            continue
 
-    if has_themes:
-        counter = Counter()
-        for raw in sub['key_themes'].dropna().tolist():
-            for t in str(raw).split(';'):
-                t = t.strip().lower()
-                if t:
-                    counter[t] += 1
-        top = [t for t, _ in counter.most_common(6)]
-        if top:
-            themes_per_cat[cat] = top
+        if has_themes:
+            counter = Counter()
+            for raw in sub['key_themes'].dropna().tolist():
+                for t in str(raw).split(';'):
+                    t = t.strip().lower()
+                    if t:
+                        counter[t] += 1
+            top = [t for t, _ in counter.most_common(6)]
+            if top:
+                themes_per_cat[cat] = top
 
-    if has_summary:
+        if has_summary:
         # Prefer summaries from the longest conversations in each category.
         # Capture the conversation `name` too so the brief can cite real
         # titles in italics (issue #20).
-        ordered = sub.sort_values('message_count', ascending=False)
-        picks = []
-        seen_summaries = set()
-        for _, row in ordered.iterrows():
-            s = str(row['summary']).strip() if pd.notna(row['summary']) else ''
-            n = str(row['name']).strip() if pd.notna(row['name']) else ''
-            if s and s.lower() not in ('nan', 'none') and s not in seen_summaries:
-                picks.append({'name': n, 'summary': s})
-                seen_summaries.add(s)
-            if len(picks) >= 4:
-                break
-        if picks:
-            samples_per_cat[cat] = picks
+            ordered = sub.sort_values('message_count', ascending=False)
+            picks = []
+            seen_summaries = set()
+            for _, row in ordered.iterrows():
+                s = str(row['summary']).strip() if pd.notna(row['summary']) else ''
+                n = str(row['name']).strip() if pd.notna(row['name']) else ''
+                if s and s.lower() not in ('nan', 'none') and s not in seen_summaries:
+                    picks.append({'name': n, 'summary': s})
+                    seen_summaries.add(s)
+                if len(picks) >= 4:
+                    break
+            if picks:
+                samples_per_cat[cat] = picks
 
-if themes_per_cat:
-    themes_block = '\n'.join(f"- {cat}: {', '.join(ts)}" for cat, ts in themes_per_cat.items())
-else:
-    themes_block = "(no theme data — classified.csv predates the summary/key_themes columns)"
+    if themes_per_cat:
+        themes_block = '\n'.join(f"- {cat}: {', '.join(ts)}" for cat, ts in themes_per_cat.items())
+    else:
+        themes_block = "(no theme data — classified.csv predates the summary/key_themes columns)"
 
-if samples_per_cat:
-    sample_lines = []
-    for cat, picks in samples_per_cat.items():
-        sample_lines.append(f"- {cat}:")
-        for p in picks:
-            if p['name']:
-                sample_lines.append(f"    • [{p['name']}] {p['summary']}")
-            else:
-                sample_lines.append(f"    • {p['summary']}")
-    samples_block = '\n'.join(sample_lines)
-else:
-    samples_block = "(no per-conversation summaries — re-run classify.py to enable)"
+    if samples_per_cat:
+        sample_lines = []
+        for cat, picks in samples_per_cat.items():
+            sample_lines.append(f"- {cat}:")
+            for p in picks:
+                if p['name']:
+                    sample_lines.append(f"    • [{p['name']}] {p['summary']}")
+                else:
+                    sample_lines.append(f"    • {p['summary']}")
+        samples_block = '\n'.join(sample_lines)
+    else:
+        samples_block = "(no per-conversation summaries — re-run classify.py to enable)"
 
-BRIEF_PROMPT = f"""You are writing a thoughtful, direct, slightly literary
+    BRIEF_PROMPT = f"""You are writing a thoughtful, direct, slightly literary
 reflection for a real person on what their AI usage shows about them. Speak
 like a careful friend who has read everything, not like a consultant. Avoid
 corporate or coaching vocabulary ("leverage", "optimise", "actionable",
@@ -484,12 +486,12 @@ Before finishing, reread your draft. Check that:
 Emit only the italic labels, the `---` separator, the section headers, the
 prose, and the `[[hl]]...[[/hl]]` markers."""
 
-resp = ollama.chat(
+    resp = ollama.chat(
     model='mistral',
     messages=[{'role': 'user', 'content': BRIEF_PROMPT}],
     options={'num_predict': 3000, 'temperature': 0.7}
 )
-brief_md_raw = resp['message']['content']
+    brief_md_raw = resp['message']['content']
 
 # ── Pull-quote post-processing (#6) ───────────────────────────────────────────
 # Model is instructed to mark one sentence per section with [[hl]]...[[/hl]].
@@ -497,104 +499,104 @@ brief_md_raw = resp['message']['content']
 # algorithmic marker pass that wraps the longest sentence in each section.
 # In HTML the markers become styled pull-quote blocks (New Yorker convention).
 # In Markdown they become blockquote+italic for clean rendering on GitHub.
-import re as _re_hl
+    import re as _re_hl
 
 # Tolerant marker pattern — accepts the model's occasional single-bracket
 # slips (`[hl]` / `[/hl]`) as well as the canonical double-bracket form.
-_hl_pattern = _re_hl.compile(
+    _hl_pattern = _re_hl.compile(
     r'\[{1,2}hl\]{1,2}(.+?)\[{1,2}/hl\]{1,2}', _re_hl.DOTALL
 )
 # Stragglers that survive substitution (e.g. unmatched opening or closing)
-_hl_straggler = _re_hl.compile(r'\[{1,2}/?hl\]{1,2}')
+    _hl_straggler = _re_hl.compile(r'\[{1,2}/?hl\]{1,2}')
 
 
-def _add_fallback_pullquotes(md):
-    """If a section has no [[hl]] markers, wrap its longest prose sentence.
+    def _add_fallback_pullquotes(md):
+        """If a section has no [[hl]] markers, wrap its longest prose sentence.
     Skips list items (bulleted, numbered) and blockquotes so the marker
     never ends up nested inside an <li>."""
-    parts = _re_hl.split(r'(?m)^(##\s.+)$', md)
-    if len(parts) < 3:
-        return md
-    list_or_quote = _re_hl.compile(r'^\s*([-*•]|\d+[.)]|>)')
-    out = [parts[0]]
-    for i in range(1, len(parts), 2):
-        heading = parts[i]
-        body = parts[i + 1] if (i + 1) < len(parts) else ''
-        if '[[hl]]' in body:
-            out.extend([heading, body]); continue
+        parts = _re_hl.split(r'(?m)^(##\s.+)$', md)
+        if len(parts) < 3:
+            return md
+        list_or_quote = _re_hl.compile(r'^\s*([-*•]|\d+[.)]|>)')
+        out = [parts[0]]
+        for i in range(1, len(parts), 2):
+            heading = parts[i]
+            body = parts[i + 1] if (i + 1) < len(parts) else ''
+            if '[[hl]]' in body:
+                out.extend([heading, body]); continue
         # Filter body to prose lines only — drop bullets, numbered items, quotes
-        prose_only = '\n'.join(
+            prose_only = '\n'.join(
             ln for ln in body.split('\n') if not list_or_quote.match(ln)
         )
-        candidates = _re_hl.findall(r'[A-Z][^.!?]*[.!?](?=\s|$)', prose_only)
-        candidates = [c.strip() for c in candidates if len(c.strip()) > 30]
-        if not candidates:
-            out.extend([heading, body]); continue
-        longest = max(candidates, key=len)
-        body = body.replace(longest, f'[[hl]]{longest}[[/hl]]', 1)
-        out.extend([heading, body])
-    return ''.join(out)
+            candidates = _re_hl.findall(r'[A-Z][^.!?]*[.!?](?=\s|$)', prose_only)
+            candidates = [c.strip() for c in candidates if len(c.strip()) > 30]
+            if not candidates:
+                out.extend([heading, body]); continue
+            longest = max(candidates, key=len)
+            body = body.replace(longest, f'[[hl]]{longest}[[/hl]]', 1)
+            out.extend([heading, body])
+        return ''.join(out)
 
 
-brief_md_raw = _add_fallback_pullquotes(brief_md_raw)
+    brief_md_raw = _add_fallback_pullquotes(brief_md_raw)
 
 # Markdown export — turn marker into a blockquote line
-brief_md = _hl_pattern.sub(lambda m: f'\n\n> *{m.group(1).strip()}*\n\n', brief_md_raw)
+    brief_md = _hl_pattern.sub(lambda m: f'\n\n> *{m.group(1).strip()}*\n\n', brief_md_raw)
 # Strip any unmatched marker stragglers from the markdown
-brief_md = _hl_straggler.sub('', brief_md)
+    brief_md = _hl_straggler.sub('', brief_md)
 
 # HTML — render markdown first (with markers intact), then replace markers
 # with a styled blockquote that breaks out of the current <p> cleanly.
-_html_pre = markdown.markdown(brief_md_raw, extensions=['extra'])
-def _hl_to_card(m):
-    text = m.group(1).strip()
-    return f'</p><blockquote class="hl-card">{text}</blockquote><p>'
-brief_html = _hl_pattern.sub(_hl_to_card, _html_pre)
+    _html_pre = markdown.markdown(brief_md_raw, extensions=['extra'])
+    def _hl_to_card(m):
+        text = m.group(1).strip()
+        return f'</p><blockquote class="hl-card">{text}</blockquote><p>'
+    brief_html = _hl_pattern.sub(_hl_to_card, _html_pre)
 # Strip any unmatched marker stragglers from the HTML too
-brief_html = _hl_straggler.sub('', brief_html)
+    brief_html = _hl_straggler.sub('', brief_html)
 # Clean up any empty paragraphs the substitution may have produced
-brief_html = _re_hl.sub(r'<p>\s*</p>', '', brief_html)
-print("  ✓ Brief generated")
+    brief_html = _re_hl.sub(r'<p>\s*</p>', '', brief_html)
+    print("  ✓ Brief generated")
 
 # ── Conversations panel (issue #20 — scope: drop in-brief citations, ─────────
 #    surface real conversations as a deterministic report section instead)
-from html import escape as _h_escape
+    from html import escape as _h_escape
 
-cat_counts = df['layer1'].value_counts().to_dict()
-panel_groups_html = []
-panel_groups_md = []
-for cat in LAYER1_ORDER:
-    picks = [p for p in samples_per_cat.get(cat, []) if p.get('name')][:2]
-    if not picks:
-        continue
-    count = int(cat_counts.get(cat, 0))
-    entries_html = '\n'.join(
+    cat_counts = df['layer1'].value_counts().to_dict()
+    panel_groups_html = []
+    panel_groups_md = []
+    for cat in LAYER1_ORDER:
+        picks = [p for p in samples_per_cat.get(cat, []) if p.get('name')][:2]
+        if not picks:
+            continue
+        count = int(cat_counts.get(cat, 0))
+        entries_html = '\n'.join(
         f'      <div class="convo-entry">\n'
         f'        <p class="convo-title">{_h_escape(p["name"])}</p>\n'
         f'        <p class="convo-summary">{_h_escape(p["summary"])}</p>\n'
         f'      </div>'
         for p in picks
     )
-    panel_groups_html.append(
+        panel_groups_html.append(
         f'    <div class="convo-cat">\n'
         f'      <p class="convo-cat-head"><span class="convo-cat-name">{cat}</span>'
         f'&nbsp;&nbsp;&middot;&nbsp;&nbsp;{count} conversations</p>\n'
         f'{entries_html}\n'
         f'    </div>'
     )
-    md_entries = '\n\n'.join(
+        md_entries = '\n\n'.join(
         f"**{p['name']}**  \n{p['summary']}" for p in picks
     )
-    panel_groups_md.append(f"### {cat} · {count} conversations\n\n{md_entries}")
-convo_panel_html = '\n'.join(panel_groups_html)
-convo_panel_md = '\n\n'.join(panel_groups_md)
-print(f"  ✓ Conversations panel ({len(panel_groups_html)} categories)")
+        panel_groups_md.append(f"### {cat} · {count} conversations\n\n{md_entries}")
+    convo_panel_html = '\n'.join(panel_groups_html)
+    convo_panel_md = '\n\n'.join(panel_groups_md)
+    print(f"  ✓ Conversations panel ({len(panel_groups_html)} categories)")
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
-print("\n  Building report...")
-now_str = datetime.now().strftime('%B %d, %Y')
+    print("\n  Building report...")
+    now_str = datetime.now().strftime('%B %d, %Y')
 
-html = f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -977,18 +979,18 @@ body {{
 </body>
 </html>"""
 
-html_path = os.path.join(OUTPUT_PATH, 'report.html')
-with open(html_path, 'w') as f:
-    f.write(html)
-print("  ✓ report.html saved")
+    html_path = os.path.join(OUTPUT_PATH, 'report.html')
+    with open(html_path, 'w') as f:
+        f.write(html)
+    print("  ✓ report.html saved")
 
 # ── Markdown ──────────────────────────────────────────────────────────────────
-l1_table = '\n'.join([
+    l1_table = '\n'.join([
     f"| {cat} | {cnt} | {cnt/total*100:.1f}% |"
     for cat, cnt in sorted(l1_dist.items(), key=lambda x: -x[1])
 ])
 
-md = f"""# Claude Mirror Report
+    md = f"""# Claude Mirror Report
 ## {name} · {now_str}
 
 > Generated locally from {total} conversations across {days} days.
@@ -1038,15 +1040,19 @@ Real conversations from the data — your deepest threads in each category.
 *Re-run monthly to track how your usage evolves.*
 """
 
-md_path = os.path.join(OUTPUT_PATH, 'report.md')
-with open(md_path, 'w') as f:
-    f.write(md)
-print("  ✓ report.md saved")
+    md_path = os.path.join(OUTPUT_PATH, 'report.md')
+    with open(md_path, 'w') as f:
+        f.write(md)
+    print("  ✓ report.md saved")
 
-print(f"""
+    print(f"""
   =============================================
   Done, {name}!
   Open your report:
   open {html_path}
   =============================================
 """)
+
+
+if __name__ == "__main__":
+    main()
