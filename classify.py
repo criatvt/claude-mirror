@@ -46,34 +46,6 @@ RESPONSE_SCHEMA = {
     'required': ['layer1', 'layer2', 'confidence', 'summary', 'key_themes'],
 }
 
-# ── Load config ───────────────────────────────────────────────────────────────
-if not os.path.exists(CONFIG_PATH):
-    print("Run onboarding first: python3 onboarding.py")
-    exit()
-
-with open(CONFIG_PATH) as f:
-    config = json.load(f)
-
-with open(DATA_PATH) as f:
-    conversations = json.load(f)
-
-platform = config.get('platform', 'claude')
-cutoff = config.get('cutoff_date')
-
-# ── Resume support ────────────────────────────────────────────────────────────
-if os.path.exists(SAVE_PATH):
-    existing = pd.read_csv(SAVE_PATH)
-    # Backward compat: ensure new columns exist on older CSVs
-    for col in ('summary', 'key_themes'):
-        if col not in existing.columns:
-            existing[col] = ''
-    done_uuids = set(existing['uuid'].tolist())
-    print(f"Resuming — {len(done_uuids)} done, {len(conversations) - len(done_uuids)} remaining.")
-else:
-    existing = pd.DataFrame(columns=CSV_COLUMNS)
-    done_uuids = set()
-    print(f"Starting fresh — {len(conversations)} conversations to classify.")
-
 # ── Platform-aware extraction ─────────────────────────────────────────────────
 def get_messages(conv, platform):
     if platform == 'claude':
@@ -185,91 +157,125 @@ fences. `layer1` must be exactly one Layer 1 string from the list above;
 `key_themes` is a JSON array of 2-4 short lowercase strings.
 {{"layer1": "Strategy", "layer2": "Planning", "confidence": "high", "summary": "...", "key_themes": ["theme1", "theme2"]}}"""
 
-# ── Classify ──────────────────────────────────────────────────────────────────
-results = []
 
-for conv in tqdm(conversations, desc="Classifying"):
-    uuid, name, created, updated, total, context = build_context(conv, platform)
+def main():
+    # ── Load config ───────────────────────────────────────────────────────────
+    if not os.path.exists(CONFIG_PATH):
+        print("Run onboarding first: python3 onboarding.py")
+        return
 
-    if not uuid or uuid in done_uuids:
-        continue
+    with open(CONFIG_PATH) as f:
+        config = json.load(f)
 
-    # Apply time filter
-    if cutoff and created:
+    with open(DATA_PATH) as f:
+        conversations = json.load(f)
+
+    platform = config.get('platform', 'claude')
+    cutoff = config.get('cutoff_date')
+
+    # ── Resume support ──────────────────────────────────────────────────────────
+    if os.path.exists(SAVE_PATH):
+        existing = pd.read_csv(SAVE_PATH)
+        # Backward compat: ensure new columns exist on older CSVs
+        for col in ('summary', 'key_themes'):
+            if col not in existing.columns:
+                existing[col] = ''
+        done_uuids = set(existing['uuid'].tolist())
+        print(f"Resuming — {len(done_uuids)} done, {len(conversations) - len(done_uuids)} remaining.")
+    else:
+        existing = pd.DataFrame(columns=CSV_COLUMNS)
+        done_uuids = set()
+        print(f"Starting fresh — {len(conversations)} conversations to classify.")
+
+    # ── Classify ────────────────────────────────────────────────────────────────
+    results = []
+
+    for conv in tqdm(conversations, desc="Classifying"):
+        uuid, name, created, updated, total, context = build_context(conv, platform)
+
+        if not uuid or uuid in done_uuids:
+            continue
+
+        # Apply time filter
+        if cutoff and created:
+            try:
+                conv_date = pd.Timestamp(created, tz='UTC')
+                if conv_date < pd.Timestamp(cutoff, tz='UTC'):
+                    continue
+            except:
+                pass
+
         try:
-            conv_date = pd.Timestamp(created, tz='UTC')
-            if conv_date < pd.Timestamp(cutoff, tz='UTC'):
-                continue
-        except:
-            pass
+            response = ollama.chat(
+                model='mistral',
+                messages=[{'role': 'user', 'content': PROMPT.format(context=context)}],
+                format=RESPONSE_SCHEMA,
+            )
+            raw = response['message']['content'].strip()
+            if '```' in raw:
+                raw = raw.split('```')[1]
+                if raw.startswith('json'):
+                    raw = raw[4:]
+            parsed = json.loads(raw)
 
-    try:
-        response = ollama.chat(
-            model='mistral',
-            messages=[{'role': 'user', 'content': PROMPT.format(context=context)}],
-            format=RESPONSE_SCHEMA,
-        )
-        raw = response['message']['content'].strip()
-        if '```' in raw:
-            raw = raw.split('```')[1]
-            if raw.startswith('json'):
-                raw = raw[4:]
-        parsed = json.loads(raw)
+            def _first_label(v, default='Unknown'):
+                if isinstance(v, list):
+                    v = v[0] if v else default
+                v = str(v).strip()
+                # If model returned "Strategy, Admin" or "Strategy/Admin", keep the first
+                for sep in (',', '/', ';', '|'):
+                    if sep in v:
+                        v = v.split(sep)[0].strip()
+                        break
+                return v or default
 
-        def _first_label(v, default='Unknown'):
-            if isinstance(v, list):
-                v = v[0] if v else default
-            v = str(v).strip()
-            # If model returned "Strategy, Admin" or "Strategy/Admin", keep the first
-            for sep in (',', '/', ';', '|'):
-                if sep in v:
-                    v = v.split(sep)[0].strip()
-                    break
-            return v or default
+            layer1 = _first_label(parsed.get('layer1'))
+            layer2 = _first_label(parsed.get('layer2'))
+            confidence = parsed.get('confidence', 'medium')
+            summary = str(parsed.get('summary', '') or '').strip().replace('\n', ' ')
+            raw_themes = parsed.get('key_themes', []) or []
+            if isinstance(raw_themes, str):
+                raw_themes = [t for t in raw_themes.replace(',', ';').split(';')]
+            themes = [str(t).strip().lower() for t in raw_themes if str(t).strip()]
+            key_themes = ';'.join(themes[:5])
+        except Exception:
+            layer1 = 'Unknown'
+            layer2 = 'Unknown'
+            confidence = 'low'
+            summary = ''
+            key_themes = ''
 
-        layer1 = _first_label(parsed.get('layer1'))
-        layer2 = _first_label(parsed.get('layer2'))
-        confidence = parsed.get('confidence', 'medium')
-        summary = str(parsed.get('summary', '') or '').strip().replace('\n', ' ')
-        raw_themes = parsed.get('key_themes', []) or []
-        if isinstance(raw_themes, str):
-            raw_themes = [t for t in raw_themes.replace(',', ';').split(';')]
-        themes = [str(t).strip().lower() for t in raw_themes if str(t).strip()]
-        key_themes = ';'.join(themes[:5])
-    except Exception:
-        layer1 = 'Unknown'
-        layer2 = 'Unknown'
-        confidence = 'low'
-        summary = ''
-        key_themes = ''
+        results.append({
+            'uuid': uuid,
+            'name': name,
+            'created_at': created,
+            'updated_at': updated,
+            'message_count': total,
+            'layer1': layer1,
+            'layer2': layer2,
+            'confidence': confidence,
+            'summary': summary,
+            'key_themes': key_themes,
+        })
 
-    results.append({
-        'uuid': uuid,
-        'name': name,
-        'created_at': created,
-        'updated_at': updated,
-        'message_count': total,
-        'layer1': layer1,
-        'layer2': layer2,
-        'confidence': confidence,
-        'summary': summary,
-        'key_themes': key_themes,
-    })
+        if len(results) % 10 == 0:
+            batch = pd.DataFrame(results)
+            combined = pd.concat([existing, batch], ignore_index=True)
+            combined = combined.reindex(columns=CSV_COLUMNS)
+            combined.to_csv(SAVE_PATH, index=False)
 
-    if len(results) % 10 == 0:
+    if results:
         batch = pd.DataFrame(results)
         combined = pd.concat([existing, batch], ignore_index=True)
         combined = combined.reindex(columns=CSV_COLUMNS)
         combined.to_csv(SAVE_PATH, index=False)
+        print(f"\nDone. {len(combined)} conversations classified.")
+        print(f"\nLayer 1 distribution:")
+        print(combined['layer1'].value_counts().to_string())
+        print(f"\nNext step: python3 report.py")
+    else:
+        print("Nothing new to classify.")
 
-if results:
-    batch = pd.DataFrame(results)
-    combined = pd.concat([existing, batch], ignore_index=True)
-    combined = combined.reindex(columns=CSV_COLUMNS)
-    combined.to_csv(SAVE_PATH, index=False)
-    print(f"\nDone. {len(combined)} conversations classified.")
-    print(f"\nLayer 1 distribution:")
-    print(combined['layer1'].value_counts().to_string())
-    print(f"\nNext step: python3 report.py")
-else:
-    print("Nothing new to classify.")
+
+if __name__ == "__main__":
+    main()
