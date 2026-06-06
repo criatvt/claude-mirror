@@ -28,6 +28,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE, 'config.json')
 DATA_DIR = os.path.join(BASE, 'data')
 DATA_PATH = os.path.join(DATA_DIR, 'conversations.json')
+REPORT_HTML = os.path.join(BASE, 'output', 'report.html')
 
 # Where to look for a freshly-downloaded export if it isn't in data/ yet.
 SCAN_DIRS = [os.path.expanduser('~/Downloads'), os.path.expanduser('~/Desktop')]
@@ -243,6 +244,29 @@ def run_onboarding_or_confirm():
         onboarding.main()
 
 
+def open_report(path):
+    """Open the finished report in the default browser, cross-platform.
+
+    Failures here are non-fatal — the report is already on disk, so we just
+    fall back to printing the path for the user to open manually.
+    """
+    if not os.path.exists(path):
+        print(f"  Open manually: {path}")
+        return
+    import subprocess
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['open', path], check=False)
+        elif sys.platform.startswith('linux'):
+            subprocess.run(['xdg-open', path], check=False)
+        elif sys.platform == 'win32':
+            subprocess.run(['start', '', path], shell=True, check=False)
+        else:
+            print(f"  Open manually: {path}")
+    except Exception:
+        print(f"  Open manually: {path}")
+
+
 def main():
     print("\n  Claude Mirror — checking prerequisites...")
     check_python_deps()
@@ -263,8 +287,9 @@ def main():
     print("\n  Generating report...")
     report.main()
 
-    # Auto-opening the report cross-platform is handled in #31.
-    print("\n  Done. Your report is in the output/ folder.")
+    print("\n  Opening your report...")
+    open_report(REPORT_HTML)
+    print("  Done. Your report is in the output/ folder.")
 
 
 if __name__ == "__main__":

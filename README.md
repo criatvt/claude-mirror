@@ -126,84 +126,77 @@ This downloads ~4GB. Takes a few minutes depending on your connection. One-time 
 
 ## Usage
 
-### Step 1 — Place your export in the data folder
+Once installed, the whole pipeline is **one command**:
 
-Create a `data/` folder inside `claude-mirror/`:
 ```bash
-mkdir data
+python3 claude_mirror.py
 ```
 
-Copy your `conversations.json` into it:
-```
-claude-mirror/
-└── data/
-    └── conversations.json
-```
+That's it. The runner does everything in order:
 
-> **Note:** Only `conversations.json` is needed. You can ignore other files in the export.
+1. **Checks prerequisites** — Python packages, Ollama running, the Mistral model, and your export — with a clear, actionable fix for anything missing (never a stack trace).
+2. **Finds your export** — if `data/conversations.json` isn't there yet, it scans `~/Downloads` and `~/Desktop` (including an unzipped `data-…/` export folder) and offers to copy it in.
+3. **Onboards you** — the first run asks 4 quick questions (name, profession, top goal, time period) and saves them to `config.json`. On later runs it just confirms: *"Welcome back — use existing settings? [Y/n]"*.
+4. **Classifies** every conversation locally with Mistral. Resumable — if interrupted, re-run and it picks up where it left off.
+5. **Generates** your report — 8 charts plus The Mirror — into `output/report.html` and `output/report.md`.
+6. **Opens** the report in your default browser automatically.
 
-### Step 2 — Run onboarding (one-time)
-```bash
-python3 onboarding.py
-```
-
-This asks you 4 quick questions:
-1. Your name
-2. Your profession (max 60 characters)
-3. Your current top goal (max 100 characters)
-4. Time period to analyse (3 months / 6 months / 12 months / all data)
-
-Takes under 2 minutes. Saves to `config.json` locally.
-
-### Step 3 — Classify conversations
-```bash
-python3 classify.py
-```
-
-Sends each conversation to Mistral (running locally) for classification.
-- **Time:** roughly 1–3 seconds per conversation. A few hundred conversations classify in a few minutes.
-- **Progress:** Live progress bar
-- **Resumable:** If interrupted, run again — it picks up where it left off
-- **Output:** `classified.csv`
-
-### Step 4 — Generate your report
-```bash
-python3 report.py
-```
-
-Generates all charts and your personal brief.
-- **Time:** under a minute for the charts, plus ~30 seconds for the brief
-- **Output:** `output/report.html` and `output/report.md`
-
-### Step 5 — Open your report
-```bash
-open output/report.html
-```
-
-On Linux:
-```bash
-xdg-open output/report.html
-```
-
-On Windows:
-```bash
-start output/report.html
-```
+> **First time?** If you haven't placed your export anywhere, just download it from your AI platform (you'll find a `conversations.json` inside the zip) and run the command — the tool will find it in your Downloads and offer to copy it in.
 
 ---
 
 ## Every Time You Re-Run
 
-To update your report with fresh data:
+To refresh your report with new data:
 
-1. Export new data from your AI platform
-2. Replace `data/conversations.json` with the new file
-3. Delete `classified.csv` (to reclassify everything) or keep it (to only classify new conversations)
-4. Run `python3 classify.py`
-5. Run `python3 report.py`
-6. Open `output/report.html`
+1. Export fresh data from your AI platform and unzip it
+2. Drop the new `conversations.json` into `data/` — or just leave it in Downloads, the runner will find it
+3. Run it again:
+
+```bash
+python3 claude_mirror.py
+```
+
+Classification resumes from where it left off, so only new conversations are processed. To reclassify everything from scratch, delete `classified.csv` first.
 
 > **Tip:** Run monthly. The most interesting insights come from watching how your usage evolves over time.
+
+---
+
+## Advanced / Debugging — running the stages separately
+
+The single command above wraps three scripts. You can run them individually to debug a stage or re-run just one. They share the same `config.json` and `classified.csv`, so mixing the one-command flow and these is fine.
+
+### 1 — Onboarding (one-time setup)
+```bash
+python3 onboarding.py
+```
+Asks the 4 questions and writes `config.json`.
+
+### 2 — Classify conversations
+```bash
+python3 classify.py
+```
+Sends each conversation to Mistral (running locally) for classification.
+- **Time:** roughly 1–3 seconds per conversation; a few hundred classify in a few minutes
+- **Progress:** live progress bar
+- **Resumable:** if interrupted, run again — it picks up where it left off
+- **Output:** `classified.csv`
+
+### 3 — Generate your report
+```bash
+python3 report.py
+```
+Builds all charts and your personal brief.
+- **Time:** under a minute for the charts, plus ~30 seconds for the brief
+- **Output:** `output/report.html` and `output/report.md`
+
+Then open it manually:
+```bash
+open output/report.html         # macOS
+xdg-open output/report.html     # Linux
+start output/report.html        # Windows
+```
 
 ---
 
@@ -217,9 +210,10 @@ claude-mirror/
 │   ├── report.html            ← Your report (open in browser)
 │   └── report.md              ← Your report (Markdown, reusable)
 ├── venv/                      ← Python virtual environment
-├── onboarding.py              ← Step 1: setup
-├── classify.py                ← Step 2: classify conversations
-├── report.py                  ← Step 3: generate report
+├── claude_mirror.py           ← One-command runner (start here)
+├── onboarding.py              ← Stage 1: setup
+├── classify.py                ← Stage 2: classify conversations
+├── report.py                  ← Stage 3: generate report
 ├── config.json                ← Your saved onboarding answers
 ├── classified.csv             ← Classification results
 ├── requirements.txt
@@ -285,6 +279,7 @@ Contributions welcome. If you're adding support for a new AI platform:
 ## Roadmap
 
 **Today**
+- **One-command runner** — `python3 claude_mirror.py` runs the whole pipeline: prereq checks, export auto-detection, inline onboarding, classify, report, and auto-open
 - Claude, ChatGPT, Gemini support
 - 8 charts + The Mirror (personal reflection)
 - Single HTML report
