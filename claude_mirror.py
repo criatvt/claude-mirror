@@ -5,24 +5,32 @@ Runs the full pipeline end-to-end:
 
     python3 claude_mirror.py
 
-It performs friendly prerequisite checks, then calls onboarding.main(),
-classify.main(), and report.main() in order. Each prereq failure produces an
-actionable message rather than a stack trace.
+It performs friendly prerequisite checks (auto-locating your export if needed),
+runs onboarding inline on first use, then calls classify.main() and
+report.main() in order. Each prereq failure produces an actionable message
+rather than a stack trace.
 
 Note: the three stage modules (onboarding/classify/report) are imported lazily
-inside main(), *after* check_python_deps() runs — importing them eagerly would
-pull in pandas/matplotlib/etc. and raise a raw ImportError before we can print a
-friendly message.
+inside main()/helpers, *after* check_python_deps() runs — importing them eagerly
+would pull in pandas/matplotlib/etc. and raise a raw ImportError before we can
+print a friendly message.
 """
+import datetime
+import glob
 import json
 import os
+import shutil
 import sys
 import urllib.request
 import urllib.error
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE, 'config.json')
-DATA_PATH = os.path.join(BASE, 'data', 'conversations.json')
+DATA_DIR = os.path.join(BASE, 'data')
+DATA_PATH = os.path.join(DATA_DIR, 'conversations.json')
+
+# Where to look for a freshly-downloaded export if it isn't in data/ yet.
+SCAN_DIRS = [os.path.expanduser('~/Downloads'), os.path.expanduser('~/Desktop')]
 
 OLLAMA_TAGS_URL = 'http://localhost:11434/api/tags'
 MODEL_NAME = 'mistral'  # kept in sync with classify.py; #10 will make this config-driven
@@ -121,14 +129,118 @@ def check_model_available(name):
         )
 
 
+# ── Smart input detection (#30) ───────────────────────────────────────────────
+def _human_size(num_bytes):
+    size = float(num_bytes)
+    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
+        if size < 1024:
+            return f"{size:.0f} {unit}" if unit == 'B' else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} PB"
+
+
+def _describe(path):
+    try:
+        size = _human_size(os.path.getsize(path))
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d')
+        return f"{path}  ({size}, modified {mtime})"
+    except OSError:
+        return path
+
+
+def find_conversations_json():
+    """Scan common download/desktop locations for a conversations.json export.
+
+    Returns a list of unique candidate paths, most-recently-modified first.
+    Covers both a bare file and one nested a single directory deep (e.g. an
+    unzipped Claude export like ~/Downloads/data-2026-.../conversations.json).
+    """
+    found, seen = [], set()
+    for d in SCAN_DIRS:
+        for pattern in (os.path.join(d, 'conversations.json'),
+                        os.path.join(d, '*', 'conversations.json')):
+            for path in glob.glob(pattern):
+                real = os.path.realpath(path)
+                if real in seen or not os.path.isfile(path):
+                    continue
+                seen.add(real)
+                found.append(path)
+    found.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+    return found
+
+
+def _copy_into_data(src):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    shutil.copy2(src, DATA_PATH)
+    print("  ✓ Copied into data/conversations.json")
+
+
+def prompt_copy_to_data(candidates):
+    """Offer to copy a discovered export into data/. Returns True if copied."""
+    try:
+        if len(candidates) == 1:
+            print(f"\n  Found a conversations export:\n    {_describe(candidates[0])}")
+            answer = input("  Copy it into data/? [Y/n] ").strip().lower()
+            if answer in ('', 'y', 'yes'):
+                _copy_into_data(candidates[0])
+                return True
+            return False
+
+        print("\n  Found multiple conversation exports:")
+        for i, path in enumerate(candidates, 1):
+            print(f"    {i}. {_describe(path)}")
+        choice = input(f"  Which to use? [1-{len(candidates)}, or n to skip] ").strip().lower()
+        if choice.isdigit() and 1 <= int(choice) <= len(candidates):
+            _copy_into_data(candidates[int(choice) - 1])
+            return True
+        return False
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return False
+
+
 def check_conversations_present():
-    # Smart input detection (auto-locating exports) arrives in #30; for now we
-    # just verify the expected file is present.
-    if not os.path.exists(DATA_PATH):
-        _fail(
-            "No conversation data found at data/conversations.json\n"
-            "    Export your history and place conversations.json in the data/ folder."
-        )
+    if os.path.exists(DATA_PATH):
+        return
+    # Not in data/ — try to auto-locate a download before giving up.
+    candidates = find_conversations_json()
+    if candidates and prompt_copy_to_data(candidates) and os.path.exists(DATA_PATH):
+        return
+    _fail(
+        "No conversation data found at data/conversations.json\n"
+        f"    Searched: {', '.join(SCAN_DIRS)}\n"
+        "    Export your history, then place conversations.json in the data/ folder."
+    )
+
+
+# ── Inline onboarding (#30) ───────────────────────────────────────────────────
+def run_onboarding_or_confirm():
+    """First run (no config): onboard inline. Returning user: one-press confirm."""
+    import onboarding
+
+    if not os.path.exists(CONFIG_PATH):
+        print("\n  First-time setup — a few quick questions.")
+        onboarding.main()
+        return
+
+    try:
+        with open(CONFIG_PATH) as f:
+            config = json.load(f)
+    except (OSError, ValueError):
+        # Unreadable/corrupt config — just re-onboard.
+        onboarding.main()
+        return
+
+    name = config.get('name', 'there')
+    created = (config.get('created_at') or '')[:10]
+    when = f" from {created}" if created else ""
+    print(f"\n  Welcome back, {name}! Found existing config{when}.")
+    try:
+        answer = input("  Use existing settings? [Y/n] ").strip().lower()
+    except EOFError:
+        answer = ''  # non-interactive: keep existing settings
+    if answer in ('n', 'no'):
+        onboarding.main()
 
 
 def main():
@@ -140,17 +252,10 @@ def main():
     print("  ✓ All prerequisites met.")
 
     # Safe to import the heavy stages now that deps are confirmed present.
-    import onboarding
     import classify
     import report
 
-    # Onboarding always prompts today; skip it when a config already exists so
-    # re-runs don't re-ask. The fuller smart/inline onboarding flow lands in #30.
-    if os.path.exists(CONFIG_PATH):
-        print("\n  Using existing config.json (run onboarding.py to change it).")
-    else:
-        print("\n  Running onboarding...")
-        onboarding.main()
+    run_onboarding_or_confirm()
 
     print("\n  Classifying conversations...")
     classify.main()
